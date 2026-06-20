@@ -29,12 +29,20 @@ class PlaceDetails {
   final double? lng;
   final String? photoUrl;
 
+  // Structured address parts (for chain location labels).
+  final String? streetNumber;
+  final String? route; // street name
+  final String? city;
+
   PlaceDetails({
     required this.name,
     required this.address,
     this.lat,
     this.lng,
     this.photoUrl,
+    this.streetNumber,
+    this.route,
+    this.city,
   });
 }
 
@@ -109,7 +117,7 @@ class PlacesService {
     final res = await http.get(uri, headers: {
       'X-Goog-Api-Key': _apiKey,
       'X-Goog-FieldMask':
-          'id,displayName,formattedAddress,location,photos',
+          'id,displayName,formattedAddress,location,photos,addressComponents',
     });
 
     // Selecting a place ends the billing session.
@@ -131,6 +139,30 @@ class PlacesService {
       if (name != null) photoUrl = photoUrlForName(name);
     }
 
+    // Parse structured address components.
+    final comps = body['addressComponents'] as List?;
+    String? findComp(String type) {
+      if (comps == null) return null;
+      for (final c in comps) {
+        final types = ((c as Map<String, dynamic>)['types'] as List?)
+                ?.map((e) => e.toString())
+                .toList() ??
+            const [];
+        if (types.contains(type)) {
+          return c['longText'] as String? ?? c['shortText'] as String?;
+        }
+      }
+      return null;
+    }
+
+    final streetNumber = findComp('street_number');
+    final route = findComp('route');
+    // For NYC boroughs the borough is the sublocality; otherwise locality.
+    final city = findComp('sublocality_level_1') ??
+        findComp('locality') ??
+        findComp('postal_town') ??
+        findComp('administrative_area_level_2');
+
     return PlaceDetails(
       name: (body['displayName']
               as Map<String, dynamic>?)?['text'] as String? ??
@@ -139,6 +171,9 @@ class PlacesService {
       lat: (location?['latitude'] as num?)?.toDouble(),
       lng: (location?['longitude'] as num?)?.toDouble(),
       photoUrl: photoUrl,
+      streetNumber: streetNumber,
+      route: route,
+      city: city,
     );
   }
 

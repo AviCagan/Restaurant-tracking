@@ -46,6 +46,12 @@ class _AddRestaurantScreenState extends State<AddRestaurantScreen> {
   String? _customPhotoPath;
   final Set<String> _categories = {};
 
+  // Structured address parts for building chain location labels.
+  String? _streetNumber;
+  String? _route;
+  String? _city;
+  bool _userTouchedLocation = false;
+
   bool _saving = false;
   bool _downloadingCover = false;
 
@@ -111,8 +117,9 @@ class _AddRestaurantScreenState extends State<AddRestaurantScreen> {
     setState(() {
       _isChain = true;
       _chainCtrl.text = detected;
-      if (_locationCtrl.text.trim().isEmpty && _addressCtrl.text.contains(',')) {
-        _locationCtrl.text = _addressCtrl.text.split(',').first.trim();
+      if (!_userTouchedLocation) {
+        final loc = _suggestedChainLocation(detected);
+        if (loc != null) _locationCtrl.text = loc;
       }
     });
     ScaffoldMessenger.of(context).showSnackBar(
@@ -120,6 +127,42 @@ class _AddRestaurantScreenState extends State<AddRestaurantScreen> {
           content: Text('Recognized "$detected" as a chain — '
               'confirm the location below.')),
     );
+  }
+
+  /// Builds a location label like "Richmond Ave, Staten Island". If another
+  /// saved location of the same chain already uses that exact label, includes
+  /// the street number to disambiguate ("123 Richmond Ave, Staten Island").
+  String? _suggestedChainLocation(String chainName) {
+    final street = _route?.trim() ?? '';
+    final city = _city?.trim() ?? '';
+
+    String base;
+    if (street.isNotEmpty) {
+      base = city.isNotEmpty ? '$street, $city' : street;
+    } else if (_addressCtrl.text.contains(',')) {
+      final parts = _addressCtrl.text.split(',');
+      base = parts.length >= 2
+          ? '${parts[0].trim()}, ${parts[1].trim()}'
+          : parts[0].trim();
+    } else {
+      final t = _addressCtrl.text.trim();
+      return t.isEmpty ? null : t;
+    }
+
+    final cn = normalizeChain(chainName);
+    final collision = _existing.any((r) =>
+        r.isChain &&
+        r.chainName != null &&
+        normalizeChain(r.chainName!) == cn &&
+        (r.locationLabel ?? '').trim().toLowerCase() == base.toLowerCase());
+
+    final number = _streetNumber?.trim() ?? '';
+    if (collision && number.isNotEmpty && street.isNotEmpty) {
+      return city.isNotEmpty
+          ? '$number $street, $city'
+          : '$number $street';
+    }
+    return base;
   }
 
   @override
@@ -140,9 +183,10 @@ class _AddRestaurantScreenState extends State<AddRestaurantScreen> {
         if (_chainCtrl.text.trim().isEmpty) {
           _chainCtrl.text = _nameCtrl.text.trim();
         }
-        if (_locationCtrl.text.trim().isEmpty &&
-            _addressCtrl.text.contains(',')) {
-          _locationCtrl.text = _addressCtrl.text.split(',').first.trim();
+        if (!_userTouchedLocation) {
+          final loc = _suggestedChainLocation(
+              _chainCtrl.text.isEmpty ? _nameCtrl.text : _chainCtrl.text);
+          if (loc != null) _locationCtrl.text = loc;
         }
       }
     });
@@ -150,16 +194,27 @@ class _AddRestaurantScreenState extends State<AddRestaurantScreen> {
 
   void _onPlaceSelected(PlaceDetails d) {
     setState(() {
-      if (d.name.isNotEmpty) _nameCtrl.text = d.name;
+      // Set address parts before the name so the name listener's chain
+      // detection can build a location from them.
       _addressCtrl.text = d.address;
       _lat = d.lat;
       _lng = d.lng;
+      _streetNumber = d.streetNumber;
+      _route = d.route;
+      _city = d.city;
       _photoUrl = d.photoUrl;
       _customPhotoPath = null;
       _downloadingCover = d.photoUrl != null;
+      if (d.name.isNotEmpty) _nameCtrl.text = d.name;
     });
     if (d.photoUrl != null) _downloadCover(d.photoUrl!);
-    _applyChainDetection(d.name);
+    _applyChainDetection(_nameCtrl.text);
+    // If already flagged a chain, refresh the suggested location for this place.
+    if (_isChain && !_userTouchedLocation) {
+      final loc = _suggestedChainLocation(
+          _chainCtrl.text.isEmpty ? _nameCtrl.text : _chainCtrl.text);
+      if (loc != null) setState(() => _locationCtrl.text = loc);
+    }
   }
 
   Future<void> _downloadCover(String url) async {
@@ -376,9 +431,10 @@ class _AddRestaurantScreenState extends State<AddRestaurantScreen> {
                         TextField(
                           controller: _locationCtrl,
                           textCapitalization: TextCapitalization.words,
+                          onChanged: (_) => _userTouchedLocation = true,
                           decoration: const InputDecoration(
                             labelText: 'This location',
-                            hintText: 'e.g. Times Square',
+                            hintText: 'e.g. Richmond Ave, Staten Island',
                           ),
                         ),
                       ],
