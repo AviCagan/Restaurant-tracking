@@ -10,6 +10,7 @@ import '../models/visit.dart';
 import '../services/media_storage.dart';
 import '../theme/app_theme.dart';
 import 'haptic_slider.dart';
+import 'rating_picker_sheet.dart';
 
 /// Editable form for a single visit (sliders, items, price, photos, notes).
 ///
@@ -308,16 +309,17 @@ class _ItemRow extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          PopupMenuButton<int>(
-            tooltip: 'Rate this item',
-            onSelected: (v) => onRatingChanged(v == 0 ? null : v),
-            itemBuilder: (_) => [
-              const PopupMenuItem(value: 0, child: Text('No rating')),
-              ...List.generate(
-                  10,
-                  (i) => PopupMenuItem(
-                      value: i + 1, child: Text('${i + 1} / 10'))),
-            ],
+          GestureDetector(
+            onTap: () async {
+              final result = await RatingPickerSheet.show(
+                context,
+                title: draft.name.text.trim().isEmpty
+                    ? 'Rate this dish'
+                    : draft.name.text.trim(),
+                current: draft.rating,
+              );
+              if (result != null) onRatingChanged(result == 0 ? null : result);
+            },
             child: Container(
               width: 46,
               height: 46,
@@ -326,7 +328,10 @@ class _ItemRow extends StatelessWidget {
                     ? AppTheme.accent.withValues(alpha: 0.14)
                     : colors.surface,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: colors.line),
+                border: Border.all(
+                    color: draft.rating != null
+                        ? AppTheme.accent
+                        : colors.line),
               ),
               child: Center(
                 child: Text(

@@ -7,6 +7,7 @@ import '../models/sort_option.dart';
 import '../services/location_service.dart';
 import '../theme/app_theme.dart';
 import '../theme/theme_controller.dart';
+import '../widgets/category_filter_sheet.dart';
 import '../widgets/restaurant_card.dart';
 import '../widgets/sort_sheet.dart';
 import 'add_restaurant_screen.dart';
@@ -85,6 +86,16 @@ class _HomeScreenState extends State<HomeScreen> {
         );
       }
     }
+  }
+
+  Future<void> _openFilter() async {
+    final result = await CategoryFilterSheet.show(context, _activeFilters);
+    if (result == null) return;
+    setState(() {
+      _activeFilters
+        ..clear()
+        ..addAll(result);
+    });
   }
 
   Future<void> _pickSort() async {
@@ -187,6 +198,10 @@ class _HomeScreenState extends State<HomeScreen> {
                         style: TextStyle(
                             fontSize: 30, fontWeight: FontWeight.w800)),
                   ),
+                  _FilterButton(
+                    count: _activeFilters.length,
+                    onTap: _openFilter,
+                  ),
                   IconButton(
                     onPressed: () => ThemeController.toggle(context),
                     icon: Icon(isDark
@@ -223,16 +238,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
             ),
-            _FilterBar(
-              active: _activeFilters,
-              onToggle: (c) {
-                setState(() {
-                  _activeFilters.contains(c)
-                      ? _activeFilters.remove(c)
-                      : _activeFilters.add(c);
-                });
-              },
-            ),
+            if (_activeFilters.isNotEmpty)
+              _ActiveFilters(
+                active: _activeFilters,
+                onRemove: (c) => setState(() => _activeFilters.remove(c)),
+              ),
             const SizedBox(height: 4),
             Expanded(
               child: _loading
@@ -267,54 +277,90 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-class _FilterBar extends StatelessWidget {
-  const _FilterBar({required this.active, required this.onToggle});
-
-  final Set<FoodCategory> active;
-  final ValueChanged<FoodCategory> onToggle;
+class _FilterButton extends StatelessWidget {
+  const _FilterButton({required this.count, required this.onTap});
+  final int count;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
-    return SizedBox(
-      height: 42,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: FoodCategory.values.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
-        itemBuilder: (_, i) {
-          final c = FoodCategory.values[i];
-          final on = active.contains(c);
-          return GestureDetector(
-            onTap: () => onToggle(c),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 150),
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: on ? AppTheme.accent : colors.surface,
-                borderRadius: BorderRadius.circular(30),
-                border: Border.all(color: on ? AppTheme.accent : colors.line),
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        IconButton(
+          onPressed: onTap,
+          icon: const Icon(Icons.tune_rounded),
+          tooltip: 'Filter',
+        ),
+        if (count > 0)
+          Positioned(
+            right: 4,
+            top: 4,
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+              decoration: const BoxDecoration(
+                color: AppTheme.accent,
+                shape: BoxShape.circle,
               ),
-              child: Row(
-                children: [
-                  Icon(c.icon,
-                      size: 15, color: on ? Colors.white : colors.subtle),
-                  const SizedBox(width: 6),
-                  Text(
-                    c.label,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: on ? Colors.white : colors.ink,
-                    ),
-                  ),
-                ],
+              child: Text(
+                '$count',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800),
               ),
             ),
-          );
-        },
+          ),
+      ],
+    );
+  }
+}
+
+class _ActiveFilters extends StatelessWidget {
+  const _ActiveFilters({required this.active, required this.onRemove});
+
+  final Set<FoodCategory> active;
+  final ValueChanged<FoodCategory> onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 38,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        children: active
+            .map((c) => Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: GestureDetector(
+                    onTap: () => onRemove(c),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 7),
+                      decoration: BoxDecoration(
+                        color: AppTheme.accent.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(c.icon, size: 14, color: AppTheme.accent),
+                          const SizedBox(width: 6),
+                          Text(c.label,
+                              style: const TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppTheme.accent)),
+                          const SizedBox(width: 4),
+                          const Icon(Icons.close,
+                              size: 13, color: AppTheme.accent),
+                        ],
+                      ),
+                    ),
+                  ),
+                ))
+            .toList(),
       ),
     );
   }
