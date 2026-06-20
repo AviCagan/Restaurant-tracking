@@ -280,7 +280,7 @@ class _AddButton extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: AppTheme.accent.withOpacity(0.45),
+            color: AppTheme.accent.withValues(alpha: 0.45),
             blurRadius: 16,
             offset: const Offset(0, 8),
           ),

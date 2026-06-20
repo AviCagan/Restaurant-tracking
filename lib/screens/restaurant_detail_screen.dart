@@ -77,7 +77,7 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
 
     return PopScope(
       canPop: false,
-      onPopInvoked: (didPop) {
+      onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
         Navigator.pop(context, _changed);
       },

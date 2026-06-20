@@ -109,7 +109,7 @@ class _HapticSliderState extends State<HapticSlider> {
               padding:
                   const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
               decoration: BoxDecoration(
-                color: widget.accent.withOpacity(0.12),
+                color: widget.accent.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
@@ -126,9 +126,9 @@ class _HapticSliderState extends State<HapticSlider> {
         SliderTheme(
           data: SliderTheme.of(context).copyWith(
             activeTrackColor: widget.accent,
-            inactiveTrackColor: widget.accent.withOpacity(0.15),
+            inactiveTrackColor: widget.accent.withValues(alpha: 0.15),
             thumbColor: widget.accent,
-            overlayColor: widget.accent.withOpacity(0.15),
+            overlayColor: widget.accent.withValues(alpha: 0.15),
             trackHeight: 5,
             thumbShape:
                 const RoundSliderThumbShape(enabledThumbRadius: 11),

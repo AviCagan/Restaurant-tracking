@@ -228,7 +228,7 @@ class _AddRatingScreenState extends State<AddRatingScreen> {
           ),
           const SizedBox(height: 20),
 
-          _Label('Restaurant name'),
+          const _Label('Restaurant name'),
           TextField(
             controller: _nameCtrl,
             textCapitalization: TextCapitalization.words,
@@ -236,7 +236,7 @@ class _AddRatingScreenState extends State<AddRatingScreen> {
           ),
           const SizedBox(height: 18),
 
-          _Label('Address'),
+          const _Label('Address'),
           if (AppConfig.hasPlacesKey)
             PlaceAutocompleteField(
               controller: _addressCtrl,
@@ -327,7 +327,7 @@ class _AddRatingScreenState extends State<AddRatingScreen> {
           ),
           const SizedBox(height: 28),
 
-          _Label('Categories'),
+          const _Label('Categories'),
           CategorySelector(
             selected: _categories,
             onChanged: (s) => setState(() {
@@ -338,7 +338,7 @@ class _AddRatingScreenState extends State<AddRatingScreen> {
           ),
           const SizedBox(height: 28),
 
-          _Label('Photos'),
+          const _Label('Photos'),
           _MediaGrid(
             paths: _mediaPaths,
             onAdd: _addMedia,
@@ -346,7 +346,7 @@ class _AddRatingScreenState extends State<AddRatingScreen> {
           ),
           const SizedBox(height: 28),
 
-          _Label('Notes'),
+          const _Label('Notes'),
           TextField(
             controller: _notesCtrl,
             maxLines: 4,
@@ -451,7 +451,7 @@ class _CoverPreview extends StatelessWidget {
             content,
             if (loading)
               Container(
-                color: Colors.black.withOpacity(0.25),
+                color: Colors.black.withValues(alpha: 0.25),
                 child: const Center(
                   child: CircularProgressIndicator(color: Colors.white),
                 ),
@@ -464,7 +464,7 @@ class _CoverPreview extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(
                       horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.55),
+                    color: Colors.black.withValues(alpha: 0.55),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: const Row(

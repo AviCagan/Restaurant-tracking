@@ -41,7 +41,7 @@ class AppTheme {
         ),
         iconTheme: const IconThemeData(color: ink),
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: surface,
         elevation: 0,
         margin: EdgeInsets.zero,
@@ -86,7 +86,7 @@ class AppTheme {
   /// Soft shadow used on cards.
   static List<BoxShadow> get cardShadow => [
         BoxShadow(
-          color: Colors.black.withOpacity(0.06),
+          color: Colors.black.withValues(alpha: 0.06),
           blurRadius: 18,
           offset: const Offset(0, 8),
         ),

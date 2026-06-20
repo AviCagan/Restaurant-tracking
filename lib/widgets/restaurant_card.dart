@@ -153,7 +153,7 @@ class _RatingBadge extends StatelessWidget {
       width: 50,
       height: 50,
       decoration: BoxDecoration(
-        color: color.withOpacity(0.14),
+        color: color.withValues(alpha: 0.14),
         borderRadius: BorderRadius.circular(15),
       ),
       child: Center(
