@@ -1,4 +1,5 @@
 import 'item.dart';
+import 'price_tier.dart';
 
 /// One visit to a restaurant. A restaurant accumulates many of these, and
 /// the restaurant's headline ratings are averaged across all its visits.
@@ -7,7 +8,7 @@ class Visit {
   final DateTime date;
   final int foodRating; // 1..10
   final int atmosphereRating; // 1..10
-  final int price; // dollars (custom, not capped)
+  final int price; // price tier 1..4 ($ to $$$$)
   final String notes;
   final List<Item> items;
   final List<String> photoPaths;
@@ -62,7 +63,7 @@ class Visit {
             (j['date'] as num).toInt()),
         foodRating: (j['foodRating'] as num?)?.toInt() ?? 5,
         atmosphereRating: (j['atmosphereRating'] as num?)?.toInt() ?? 5,
-        price: (j['price'] as num?)?.toInt() ?? 0,
+        price: PriceTier.fromStored((j['price'] as num?)?.toInt() ?? 2),
         notes: j['notes'] as String? ?? '',
         items: (j['items'] as List? ?? [])
             .map((e) => Item.fromJson(e as Map<String, dynamic>))

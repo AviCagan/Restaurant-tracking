@@ -2,7 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:restaurant_tracker/models/restaurant.dart';
 import 'package:restaurant_tracker/models/visit.dart';
 import 'package:restaurant_tracker/models/item.dart';
-import 'package:restaurant_tracker/models/category.dart';
+import 'package:restaurant_tracker/models/price_tier.dart';
 
 void main() {
   test('Restaurant with visits survives toMap/fromMap round-trip', () {
@@ -15,7 +15,7 @@ void main() {
       lat: 40.5,
       lng: -74.1,
       photoUrl: 'https://example.com/p.jpg',
-      categoryKeys: [FoodCategory.vegan.key, FoodCategory.healthy.key],
+      categoryKeys: const ['vegan', 'healthy'],
       createdAt: now,
       updatedAt: now,
       visits: [
@@ -24,7 +24,7 @@ void main() {
           date: now,
           foodRating: 9,
           atmosphereRating: 7,
-          price: 80,
+          price: 3, // tier $$$
           notes: 'Loved the salad',
           items: const [
             Item(name: 'Kale Salad', price: 14, rating: 9),
@@ -44,7 +44,7 @@ void main() {
     final v = restored.visits.first;
     expect(v.foodRating, 9);
     expect(v.atmosphereRating, 7);
-    expect(v.price, 80);
+    expect(v.price, 3);
     expect(v.notes, 'Loved the salad');
     expect(v.items.length, 2);
     expect(v.items.first.name, 'Kale Salad');
@@ -70,14 +70,23 @@ void main() {
       address: '',
       createdAt: now,
       updatedAt: now,
-      visits: [mk(10, 8, 100), mk(6, 6, 50)],
+      visits: [mk(10, 8, 4), mk(6, 6, 2)], // price tiers $$$$ and $$
     );
 
     expect(r.visitCount, 2);
     expect(r.avgFood, 8.0); // (10+6)/2
     expect(r.avgAtmosphere, 7.0); // (8+6)/2
-    expect(r.avgPrice, 75.0); // (100+50)/2
+    expect(r.avgPrice, 3.0); // ($$$$ + $$)/2
     expect(r.overallRating, 7.5); // (8+7)/2
+  });
+
+  test('PriceTier maps legacy dollar amounts onto tiers', () {
+    expect(PriceTier.fromStored(3), 3); // already a tier
+    expect(PriceTier.fromStored(15), 1); // < $20
+    expect(PriceTier.fromStored(40), 2); // < $50
+    expect(PriceTier.fromStored(90), 3); // < $100
+    expect(PriceTier.fromStored(250), 4); // $100+
+    expect(PriceTier.signs(2), '\$\$');
   });
 
   test('Empty visits give zeroed aggregates and null cover', () {

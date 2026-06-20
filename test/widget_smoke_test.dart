@@ -3,7 +3,6 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:restaurant_tracker/models/restaurant.dart';
 import 'package:restaurant_tracker/models/visit.dart';
-import 'package:restaurant_tracker/models/category.dart';
 import 'package:restaurant_tracker/theme/app_theme.dart';
 import 'package:restaurant_tracker/widgets/haptic_slider.dart';
 import 'package:restaurant_tracker/widgets/restaurant_card.dart';
@@ -24,12 +23,12 @@ Restaurant _restaurant(List<Visit> visits) {
   );
 }
 
-Visit _visit(int food, int atmos, int price) => Visit(
+Visit _visit(int food, int atmos, int priceTier) => Visit(
       id: 'v${food}_$atmos',
       date: DateTime.now(),
       foodRating: food,
       atmosphereRating: atmos,
-      price: price,
+      price: priceTier,
     );
 
 void main() {
@@ -71,7 +70,7 @@ void main() {
   testWidgets('RestaurantCard shows name, address, visits and avg score',
       (tester) async {
     // Two visits: overall = avg of (9+8)/2 and (7+8)/2 = (8.5 + 7.5)/2 = 8.0
-    final r = _restaurant([_visit(9, 8, 30), _visit(7, 8, 20)]);
+    final r = _restaurant([_visit(9, 8, 3), _visit(7, 8, 2)]);
 
     await tester.pumpWidget(_wrap(RestaurantCard(restaurant: r)));
 
@@ -82,7 +81,7 @@ void main() {
   });
 
   testWidgets('CategorySelector toggles a category on tap', (tester) async {
-    Set<FoodCategory> selected = {};
+    Set<String> selected = {};
     await tester.pumpWidget(_wrap(
       StatefulBuilder(
         builder: (context, setState) => CategorySelector(
@@ -95,6 +94,6 @@ void main() {
     expect(selected.isEmpty, true);
     await tester.tap(find.text('Vegan'));
     await tester.pump();
-    expect(selected.contains(FoodCategory.vegan), true);
+    expect(selected.contains('vegan'), true);
   });
 }

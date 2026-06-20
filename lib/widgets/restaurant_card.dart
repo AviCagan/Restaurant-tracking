@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
+import '../models/price_tier.dart';
 import '../models/restaurant.dart';
 import '../theme/app_theme.dart';
 
@@ -80,7 +81,7 @@ class RestaurantCard extends StatelessWidget {
                             const SizedBox(width: 6),
                             _Pill(
                               icon: Icons.payments_outlined,
-                              label: '\$${restaurant.avgPrice.round()}',
+                              label: PriceTier.signs(restaurant.avgPrice.round()),
                             ),
                           ],
                           if (distanceMeters != null) ...[

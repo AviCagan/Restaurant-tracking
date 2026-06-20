@@ -3,16 +3,19 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 
 import '../models/item.dart';
+import '../models/price_tier.dart';
 import '../models/visit.dart';
 import '../services/media_storage.dart';
 import '../theme/app_theme.dart';
 import 'haptic_slider.dart';
 import 'rating_picker_sheet.dart';
 
-/// Editable form for a single visit (sliders, items, price, photos, notes).
+/// Editable form for a single visit (date, sliders, price tier, items,
+/// photos, notes).
 ///
 /// Parents drive it with a `GlobalKey<VisitFormState>` and call
 /// [VisitFormState.collect] to read the resulting [Visit] on save.
@@ -40,12 +43,12 @@ class _ItemDraft {
 
 class VisitFormState extends State<VisitForm> {
   final _picker = ImagePicker();
-  final _priceCtrl = TextEditingController();
   final _notesCtrl = TextEditingController();
 
+  DateTime _date = DateTime.now();
   int _food = 5;
   int _atmosphere = 5;
-  int _price = 50;
+  int _priceTier = 2;
   final List<_ItemDraft> _items = [];
   final List<String> _photoPaths = [];
 
@@ -54,22 +57,21 @@ class VisitFormState extends State<VisitForm> {
     super.initState();
     final v = widget.initial;
     if (v != null) {
+      _date = v.date;
       _food = v.foodRating;
       _atmosphere = v.atmosphereRating;
-      _price = v.price;
+      _priceTier = PriceTier.clamp(v.price);
       _notesCtrl.text = v.notes;
       _photoPaths.addAll(v.photoPaths);
       for (final it in v.items) {
-        _items.add(_ItemDraft(
-            name: it.name, price: it.price, rating: it.rating));
+        _items.add(
+            _ItemDraft(name: it.name, price: it.price, rating: it.rating));
       }
     }
-    _priceCtrl.text = _price.toString();
   }
 
   @override
   void dispose() {
-    _priceCtrl.dispose();
     _notesCtrl.dispose();
     for (final i in _items) {
       i.dispose();
@@ -91,32 +93,27 @@ class VisitFormState extends State<VisitForm> {
     }
     return Visit(
       id: widget.initial?.id ?? const Uuid().v4(),
-      date: widget.initial?.date ?? DateTime.now(),
+      date: _date,
       foodRating: _food,
       atmosphereRating: _atmosphere,
-      price: _price,
+      price: _priceTier,
       notes: _notesCtrl.text.trim(),
       items: items,
       photoPaths: List.of(_photoPaths),
     );
   }
 
-  void _setPrice(int value) {
-    setState(() {
-      _price = value;
-      _priceCtrl.text = value.toString();
-      _priceCtrl.selection =
-          TextSelection.collapsed(offset: _priceCtrl.text.length);
-    });
-  }
-
-  void _onPriceTyped(String raw) {
-    final v = int.tryParse(raw);
-    if (v == null) {
-      setState(() => _price = 0);
-      return;
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _date,
+      firstDate: DateTime(2000),
+      lastDate: DateTime.now(),
+    );
+    if (picked != null) {
+      setState(() => _date = DateTime(
+          picked.year, picked.month, picked.day, _date.hour, _date.minute));
     }
-    setState(() => _price = v < 0 ? 0 : v);
   }
 
   Future<void> _addPhotos() async {
@@ -135,6 +132,34 @@ class VisitFormState extends State<VisitForm> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // ---- Date ----
+        const _SectionLabel('Date'),
+        const SizedBox(height: 8),
+        GestureDetector(
+          onTap: _pickDate,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+            decoration: BoxDecoration(
+              color: colors.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: colors.line),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.calendar_today_outlined,
+                    size: 18, color: colors.subtle),
+                const SizedBox(width: 12),
+                Text(DateFormat.yMMMMd().format(_date),
+                    style: const TextStyle(
+                        fontSize: 15, fontWeight: FontWeight.w600)),
+                const Spacer(),
+                Icon(Icons.edit_outlined, size: 16, color: colors.subtle),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 24),
+
         HapticSlider(
           label: 'Food',
           subtitle: 'How good was the food? (1–10)',
@@ -156,46 +181,14 @@ class VisitFormState extends State<VisitForm> {
           haptic: SliderHaptic.heavy,
           onChanged: (v) => setState(() => _atmosphere = v),
         ),
-        const SizedBox(height: 18),
-        HapticSlider(
-          label: 'Price',
-          subtitle: 'Drag for a quick pick, or type any amount below',
-          value: _price,
-          min: 1,
-          max: 500,
-          step: 10,
-          haptic: SliderHaptic.light,
-          valueLabelBuilder: (v) => '\$$v',
-          onChanged: _setPrice,
-        ),
+        const SizedBox(height: 24),
+
+        // ---- Price tier ----
+        const _SectionLabel('Price'),
         const SizedBox(height: 10),
-        Row(
-          children: [
-            Text('Exact amount',
-                style: TextStyle(
-                    fontSize: 13,
-                    color: colors.subtle,
-                    fontWeight: FontWeight.w600)),
-            const Spacer(),
-            SizedBox(
-              width: 130,
-              child: TextField(
-                controller: _priceCtrl,
-                keyboardType: TextInputType.number,
-                textAlign: TextAlign.center,
-                inputFormatters: [
-                  FilteringTextInputFormatter.digitsOnly,
-                  LengthLimitingTextInputFormatter(6),
-                ],
-                decoration: const InputDecoration(
-                  prefixText: '\$ ',
-                  contentPadding:
-                      EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                ),
-                onChanged: _onPriceTyped,
-              ),
-            ),
-          ],
+        _PriceTierSelector(
+          selected: _priceTier,
+          onChanged: (t) => setState(() => _priceTier = t),
         ),
         const SizedBox(height: 28),
 
@@ -252,12 +245,76 @@ class VisitFormState extends State<VisitForm> {
   }
 }
 
+class _PriceTierSelector extends StatelessWidget {
+  const _PriceTierSelector({required this.selected, required this.onChanged});
+
+  final int selected;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return Row(
+      children: List.generate(4, (i) {
+        final tier = i + 1;
+        final on = tier == selected;
+        return Expanded(
+          child: Padding(
+            padding: EdgeInsets.only(right: i < 3 ? 8 : 0),
+            child: GestureDetector(
+              onTap: () {
+                HapticFeedback.selectionClick();
+                onChanged(tier);
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 120),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                decoration: BoxDecoration(
+                  color: on ? AppTheme.accent : colors.surface,
+                  borderRadius: BorderRadius.circular(14),
+                  border:
+                      Border.all(color: on ? AppTheme.accent : colors.line),
+                ),
+                child: Column(
+                  children: [
+                    Text(
+                      PriceTier.signs(tier),
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w900,
+                        color: on ? Colors.white : colors.ink,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      PriceTier.range(tier),
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 9.5,
+                        height: 1.1,
+                        fontWeight: FontWeight.w600,
+                        color: on
+                            ? Colors.white.withValues(alpha: 0.9)
+                            : colors.subtle,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      }),
+    );
+  }
+}
+
 class _SectionLabel extends StatelessWidget {
   const _SectionLabel(this.text);
   final String text;
   @override
-  Widget build(BuildContext context) =>
-      Text(text, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800));
+  Widget build(BuildContext context) => Text(text,
+      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800));
 }
 
 class _ItemRow extends StatelessWidget {
@@ -339,7 +396,8 @@ class _ItemRow extends StatelessWidget {
                   style: TextStyle(
                     fontWeight: FontWeight.w800,
                     fontSize: 16,
-                    color: draft.rating != null ? AppTheme.accent : colors.subtle,
+                    color:
+                        draft.rating != null ? AppTheme.accent : colors.subtle,
                   ),
                 ),
               ),
@@ -383,7 +441,8 @@ class _PhotoGrid extends StatelessWidget {
               borderRadius: BorderRadius.circular(14),
               border: Border.all(color: colors.line),
             ),
-            child: Icon(Icons.add_photo_alternate_outlined, color: colors.subtle),
+            child:
+                Icon(Icons.add_photo_alternate_outlined, color: colors.subtle),
           ),
         ),
         ...paths.map((path) => Stack(

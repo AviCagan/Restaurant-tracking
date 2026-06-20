@@ -7,7 +7,6 @@ import 'package:uuid/uuid.dart';
 
 import '../config.dart';
 import '../data/restaurant_database.dart';
-import '../models/category.dart';
 import '../models/restaurant.dart';
 import '../services/media_storage.dart';
 import '../services/places_service.dart';
@@ -41,7 +40,7 @@ class _AddRestaurantScreenState extends State<AddRestaurantScreen> {
   double? _lng;
   String? _photoUrl;
   String? _customPhotoPath;
-  final Set<FoodCategory> _categories = {};
+  final Set<String> _categories = {};
 
   bool _saving = false;
   bool _downloadingCover = false;
@@ -60,7 +59,7 @@ class _AddRestaurantScreenState extends State<AddRestaurantScreen> {
       _lng = e.lng;
       _photoUrl = e.photoUrl;
       _customPhotoPath = e.customPhotoPath;
-      _categories.addAll(FoodCategory.fromKeys(e.categoryKeys));
+      _categories.addAll(e.categoryKeys);
     }
   }
 
@@ -125,7 +124,7 @@ class _AddRestaurantScreenState extends State<AddRestaurantScreen> {
       lng: _lng,
       photoUrl: _photoUrl,
       customPhotoPath: _customPhotoPath,
-      categoryKeys: _categories.map((c) => c.key).toList(),
+      categoryKeys: _categories.toList(),
       visits: _isEditing
           ? e!.visits
           : [_visitKey.currentState!.collect()],
@@ -234,6 +233,7 @@ class _AddRestaurantScreenState extends State<AddRestaurantScreen> {
           const SizedBox(height: 10),
           CategorySelector(
             selected: _categories,
+            editable: true,
             onChanged: (s) => setState(() {
               _categories
                 ..clear()

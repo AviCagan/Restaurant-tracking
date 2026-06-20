@@ -1,19 +1,18 @@
 import 'package:flutter/material.dart';
 
-import '../models/category.dart';
 import '../theme/app_theme.dart';
 import 'category_selector.dart';
 
 /// Bottom sheet to pick which categories to filter by (multi-select).
-/// Returns the chosen set, or null if dismissed without applying.
+/// Returns the chosen set of category keys, or null if dismissed.
 class CategoryFilterSheet extends StatefulWidget {
   const CategoryFilterSheet({super.key, required this.initial});
 
-  final Set<FoodCategory> initial;
+  final Set<String> initial;
 
-  static Future<Set<FoodCategory>?> show(
-      BuildContext context, Set<FoodCategory> initial) {
-    return showModalBottomSheet<Set<FoodCategory>>(
+  static Future<Set<String>?> show(
+      BuildContext context, Set<String> initial) {
+    return showModalBottomSheet<Set<String>>(
       context: context,
       isScrollControlled: true,
       backgroundColor: context.colors.surface,
@@ -29,7 +28,7 @@ class CategoryFilterSheet extends StatefulWidget {
 }
 
 class _CategoryFilterSheetState extends State<CategoryFilterSheet> {
-  late Set<FoodCategory> _selected = {...widget.initial};
+  late Set<String> _selected = {...widget.initial};
 
   @override
   Widget build(BuildContext context) {

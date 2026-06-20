@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../data/category_store.dart';
 import '../data/restaurant_database.dart';
-import '../models/category.dart';
 import '../models/restaurant.dart';
 import '../models/sort_option.dart';
 import '../services/location_service.dart';
@@ -29,7 +29,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _loading = true;
 
   SortOption _sort = SortOption.newest;
-  final Set<FoodCategory> _activeFilters = {};
+  final Set<String> _activeFilters = {};
   String _query = '';
 
   double? _myLat;
@@ -130,7 +130,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final q = _query.trim().toLowerCase();
     var list = _all.where((r) {
       final matchesFilter = _activeFilters.isEmpty ||
-          r.categoryKeys.any((k) => _activeFilters.any((f) => f.key == k));
+          r.categoryKeys.any(_activeFilters.contains);
       final matchesQuery = q.isEmpty ||
           r.name.toLowerCase().contains(q) ||
           r.address.toLowerCase().contains(q);
@@ -321,21 +321,22 @@ class _FilterButton extends StatelessWidget {
 class _ActiveFilters extends StatelessWidget {
   const _ActiveFilters({required this.active, required this.onRemove});
 
-  final Set<FoodCategory> active;
-  final ValueChanged<FoodCategory> onRemove;
+  final Set<String> active;
+  final ValueChanged<String> onRemove;
 
   @override
   Widget build(BuildContext context) {
+    final cats = CategoryStore.fromKeys(active.toList());
     return SizedBox(
       height: 38,
       child: ListView(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
-        children: active
+        children: cats
             .map((c) => Padding(
                   padding: const EdgeInsets.only(right: 8),
                   child: GestureDetector(
-                    onTap: () => onRemove(c),
+                    onTap: () => onRemove(c.key),
                     child: Container(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 12, vertical: 7),
