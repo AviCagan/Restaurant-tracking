@@ -74,6 +74,26 @@ class _HomeScreenState extends State<HomeScreen> {
     if (changed == true) _load();
   }
 
+  Future<bool> _confirmDelete(Restaurant r) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Delete restaurant?'),
+        content: Text('Remove "${r.name}" and all its visits?'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Delete',
+                  style: TextStyle(color: AppTheme.accent))),
+        ],
+      ),
+    );
+    return ok ?? false;
+  }
+
   Future<void> _quickAddVisit(Restaurant r) async {
     final added = await Navigator.push<bool>(
       context,
@@ -285,12 +305,39 @@ class _HomeScreenState extends State<HomeScreen> {
                                 const SizedBox(height: 12),
                             itemBuilder: (_, i) {
                               final r = visible[i];
-                              return RestaurantCard(
-                                restaurant: r,
-                                distanceMeters:
-                                    showDistance ? _distanceTo(r) : null,
-                                onTap: () => _openDetail(r),
-                                onLongPress: () => _quickAddVisit(r),
+                              return Dismissible(
+                                key: ValueKey(r.id),
+                                background: const _SwipeBackground(
+                                  alignment: Alignment.centerLeft,
+                                  color: Color(0xFFE0484D),
+                                  icon: Icons.delete_outline,
+                                  label: 'Delete',
+                                ),
+                                secondaryBackground: const _SwipeBackground(
+                                  alignment: Alignment.centerRight,
+                                  color: AppTheme.accent,
+                                  icon: Icons.add,
+                                  label: 'Add visit',
+                                ),
+                                confirmDismiss: (dir) async {
+                                  if (dir == DismissDirection.startToEnd) {
+                                    final ok = await _confirmDelete(r);
+                                    if (ok) await _db.delete(r.id);
+                                    return ok;
+                                  } else {
+                                    await _quickAddVisit(r);
+                                    return false;
+                                  }
+                                },
+                                onDismissed: (_) => setState(() =>
+                                    _all.removeWhere((x) => x.id == r.id)),
+                                child: RestaurantCard(
+                                  restaurant: r,
+                                  distanceMeters:
+                                      showDistance ? _distanceTo(r) : null,
+                                  onTap: () => _openDetail(r),
+                                  onLongPress: () => _quickAddVisit(r),
+                                ),
                               );
                             },
                           ),
@@ -298,6 +345,44 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _SwipeBackground extends StatelessWidget {
+  const _SwipeBackground({
+    required this.alignment,
+    required this.color,
+    required this.icon,
+    required this.label,
+  });
+
+  final Alignment alignment;
+  final Color color;
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      alignment: alignment,
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: Colors.white),
+          const SizedBox(width: 8),
+          Text(label,
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 15)),
+        ],
       ),
     );
   }
