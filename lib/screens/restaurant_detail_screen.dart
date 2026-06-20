@@ -149,6 +149,49 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
                       Text(_r.name,
                           style: const TextStyle(
                               fontSize: 26, fontWeight: FontWeight.w800)),
+                      if (_r.isChain) ...[
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            if (_r.locationDescriptor != null)
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.accent
+                                      .withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.place,
+                                        size: 14, color: AppTheme.accent),
+                                    const SizedBox(width: 5),
+                                    Text(
+                                      _r.locationDescriptor!,
+                                      style: const TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w800,
+                                          color: AppTheme.accent),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            Icon(Icons.storefront_outlined,
+                                size: 14, color: colors.subtle),
+                            const SizedBox(width: 5),
+                            Text('Part of ${_r.chainName ?? _r.name}',
+                                style: TextStyle(
+                                    fontSize: 12.5, color: colors.subtle)),
+                          ],
+                        ),
+                      ],
                       const SizedBox(height: 6),
                       Text(_r.address,
                           style: TextStyle(color: colors.subtle, fontSize: 14)),

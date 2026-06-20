@@ -69,28 +69,34 @@ class RestaurantCard extends StatelessWidget {
                             fontSize: 12.5, color: colors.subtle, height: 1.25),
                       ),
                       const SizedBox(height: 5),
-                      Row(
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
                         children: [
+                          if (restaurant.isChain &&
+                              restaurant.locationDescriptor != null)
+                            _Pill(
+                              icon: Icons.place_outlined,
+                              label: restaurant.locationDescriptor!,
+                              accent: true,
+                            ),
                           _Pill(
                             icon: Icons.event_repeat_outlined,
                             label: restaurant.visitCount == 1
                                 ? '1 visit'
                                 : '${restaurant.visitCount} visits',
                           ),
-                          if (restaurant.avgPrice > 0) ...[
-                            const SizedBox(width: 6),
+                          if (restaurant.avgPrice > 0)
                             _Pill(
                               icon: Icons.payments_outlined,
-                              label: PriceTier.signs(restaurant.avgPrice.round()),
+                              label:
+                                  PriceTier.signs(restaurant.avgPrice.round()),
                             ),
-                          ],
-                          if (distanceMeters != null) ...[
-                            const SizedBox(width: 6),
+                          if (distanceMeters != null)
                             _Pill(
                               icon: Icons.near_me_outlined,
                               label: _formatDistance(distanceMeters!),
                             ),
-                          ],
                         ],
                       ),
                     ],
@@ -113,29 +119,33 @@ class RestaurantCard extends StatelessWidget {
 }
 
 class _Pill extends StatelessWidget {
-  const _Pill({required this.icon, required this.label});
+  const _Pill({required this.icon, required this.label, this.accent = false});
   final IconData icon;
   final String label;
+  final bool accent;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+    final fg = accent ? AppTheme.accent : colors.subtle;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: colors.background,
+        color: accent
+            ? AppTheme.accent.withValues(alpha: 0.12)
+            : colors.background,
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 12, color: colors.subtle),
+          Icon(icon, size: 12, color: fg),
           const SizedBox(width: 4),
           Text(label,
               style: TextStyle(
                   fontSize: 11,
-                  color: colors.subtle,
-                  fontWeight: FontWeight.w600)),
+                  color: fg,
+                  fontWeight: accent ? FontWeight.w700 : FontWeight.w600)),
         ],
       ),
     );

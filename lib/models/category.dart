@@ -20,7 +20,11 @@ const List<IconData> categoryIcons = [
   Icons.cake_outlined, // 14
   Icons.local_cafe_outlined, // 15
   Icons.label_outline, // 16
+  Icons.storefront_outlined, // 17 - used for chains
 ];
+
+/// Icon index used for auto-created chain categories.
+const int chainIconIndex = 17;
 
 /// A category the user can tag restaurants with. Defaults are seeded but the
 /// user can add and remove their own.

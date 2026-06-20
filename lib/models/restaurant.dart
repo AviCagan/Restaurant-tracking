@@ -23,6 +23,17 @@ class Restaurant {
   final List<String> categoryKeys;
   final List<Visit> visits;
 
+  // ---- Chain support ----
+  /// Whether this is one location of a multi-location chain.
+  final bool isChain;
+
+  /// The chain's name (also auto-added as a shared category), e.g. "Chipotle".
+  final String? chainName;
+
+  /// A short label clarifying *which* location this is (e.g. "Times Square"),
+  /// so different locations of the same chain are easy to tell apart.
+  final String? locationLabel;
+
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -42,6 +53,9 @@ class Restaurant {
     this.customPhotoPath,
     this.categoryKeys = const [],
     this.visits = const [],
+    this.isChain = false,
+    this.chainName,
+    this.locationLabel,
     required this.createdAt,
     required this.updatedAt,
     this.ownerId,
@@ -72,6 +86,16 @@ class Restaurant {
   bool get coverIsLocalFile =>
       customPhotoPath != null && customPhotoPath!.isNotEmpty;
 
+  /// A short location descriptor for chains: the user's [locationLabel] if set,
+  /// otherwise the first part of the address (e.g. the street).
+  String? get locationDescriptor {
+    if (locationLabel != null && locationLabel!.trim().isNotEmpty) {
+      return locationLabel!.trim();
+    }
+    if (address.trim().isEmpty) return null;
+    return address.split(',').first.trim();
+  }
+
   Restaurant copyWith({
     String? name,
     String? address,
@@ -82,6 +106,9 @@ class Restaurant {
     String? customPhotoPath,
     List<String>? categoryKeys,
     List<Visit>? visits,
+    bool? isChain,
+    String? chainName,
+    String? locationLabel,
     DateTime? updatedAt,
     String? ownerId,
     String? visibility,
@@ -98,6 +125,9 @@ class Restaurant {
       customPhotoPath: customPhotoPath ?? this.customPhotoPath,
       categoryKeys: categoryKeys ?? this.categoryKeys,
       visits: visits ?? this.visits,
+      isChain: isChain ?? this.isChain,
+      chainName: chainName ?? this.chainName,
+      locationLabel: locationLabel ?? this.locationLabel,
       createdAt: createdAt,
       updatedAt: updatedAt ?? DateTime.now(),
       ownerId: ownerId ?? this.ownerId,
@@ -117,6 +147,9 @@ class Restaurant {
         'customPhotoPath': customPhotoPath,
         'categoryKeys': jsonEncode(categoryKeys),
         'visits': jsonEncode(visits.map((v) => v.toJson()).toList()),
+        'isChain': isChain ? 1 : 0,
+        'chainName': chainName,
+        'locationLabel': locationLabel,
         'createdAt': createdAt.millisecondsSinceEpoch,
         'updatedAt': updatedAt.millisecondsSinceEpoch,
         'ownerId': ownerId,
@@ -152,6 +185,9 @@ class Restaurant {
       customPhotoPath: m['customPhotoPath'] as String?,
       categoryKeys: decodeStrings(m['categoryKeys']),
       visits: decodeVisits(m['visits']),
+      isChain: (m['isChain'] as num?)?.toInt() == 1,
+      chainName: m['chainName'] as String?,
+      locationLabel: m['locationLabel'] as String?,
       createdAt:
           DateTime.fromMillisecondsSinceEpoch((m['createdAt'] as num).toInt()),
       updatedAt:

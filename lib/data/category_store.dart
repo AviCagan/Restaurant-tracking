@@ -46,6 +46,16 @@ class CategoryStore {
     await _save();
   }
 
+  /// Returns an existing category whose label matches (case-insensitive), or
+  /// creates one. Used so a chain only ever gets a single shared category.
+  static Future<AppCategory> ensure(String label, {int iconIndex = 0}) async {
+    final clean = label.trim();
+    for (final c in all.value) {
+      if (c.label.toLowerCase() == clean.toLowerCase()) return c;
+    }
+    return add(clean, iconIndex: iconIndex);
+  }
+
   static AppCategory? byKey(String key) {
     for (final c in all.value) {
       if (c.key == key) return c;

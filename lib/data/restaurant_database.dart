@@ -13,7 +13,7 @@ class RestaurantDatabase {
 
   static const _dbName = 'restaurants.db';
   static const _table = 'restaurants';
-  static const _version = 2;
+  static const _version = 3;
 
   Database? _db;
 
@@ -38,6 +38,9 @@ class RestaurantDatabase {
             customPhotoPath TEXT,
             categoryKeys TEXT,
             visits TEXT,
+            isChain INTEGER,
+            chainName TEXT,
+            locationLabel TEXT,
             createdAt INTEGER,
             updatedAt INTEGER,
             ownerId TEXT,
@@ -49,6 +52,12 @@ class RestaurantDatabase {
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
           await _migrateToVisits(db);
+        }
+        if (oldVersion < 3) {
+          await db.execute('ALTER TABLE $_table ADD COLUMN isChain INTEGER');
+          await db.execute('ALTER TABLE $_table ADD COLUMN chainName TEXT');
+          await db
+              .execute('ALTER TABLE $_table ADD COLUMN locationLabel TEXT');
         }
       },
     );

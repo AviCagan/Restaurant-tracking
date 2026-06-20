@@ -116,14 +116,30 @@ class VisitFormState extends State<VisitForm> {
     }
   }
 
+  static const _maxPhotos = 10;
+
   Future<void> _addPhotos() async {
-    final imgs = await _picker.pickMultiImage(maxWidth: 1600, imageQuality: 85);
+    final remaining = _maxPhotos - _photoPaths.length;
+    if (remaining <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Up to $_maxPhotos photos per visit.')),
+      );
+      return;
+    }
+    final imgs = await _picker.pickMultiImage(
+        maxWidth: 1600, imageQuality: 85, limit: remaining);
     if (imgs.isEmpty) return;
     final persisted = <String>[];
-    for (final img in imgs) {
+    for (final img in imgs.take(remaining)) {
       persisted.add(await MediaStorage.persist(img.path));
     }
-    if (mounted) setState(() => _photoPaths.addAll(persisted));
+    if (!mounted) return;
+    setState(() => _photoPaths.addAll(persisted));
+    if (imgs.length > remaining) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Only the first $_maxPhotos were added.')),
+      );
+    }
   }
 
   @override
@@ -220,10 +236,18 @@ class VisitFormState extends State<VisitForm> {
         const SizedBox(height: 28),
 
         // ---- Photos ----
-        const _SectionLabel('Photos'),
+        Row(
+          children: [
+            const _SectionLabel('Photos'),
+            const SizedBox(width: 8),
+            Text('${_photoPaths.length}/$_maxPhotos',
+                style: TextStyle(fontSize: 12.5, color: colors.subtle)),
+          ],
+        ),
         const SizedBox(height: 10),
         _PhotoGrid(
           paths: _photoPaths,
+          canAdd: _photoPaths.length < _maxPhotos,
           onAdd: _addPhotos,
           onRemove: (p) => setState(() => _photoPaths.remove(p)),
         ),
@@ -416,11 +440,13 @@ class _ItemRow extends StatelessWidget {
 class _PhotoGrid extends StatelessWidget {
   const _PhotoGrid({
     required this.paths,
+    required this.canAdd,
     required this.onAdd,
     required this.onRemove,
   });
 
   final List<String> paths;
+  final bool canAdd;
   final VoidCallback onAdd;
   final ValueChanged<String> onRemove;
 
@@ -431,20 +457,21 @@ class _PhotoGrid extends StatelessWidget {
       spacing: 10,
       runSpacing: 10,
       children: [
-        GestureDetector(
-          onTap: onAdd,
-          child: Container(
-            width: 84,
-            height: 84,
-            decoration: BoxDecoration(
-              color: colors.surface,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: colors.line),
+        if (canAdd)
+          GestureDetector(
+            onTap: onAdd,
+            child: Container(
+              width: 84,
+              height: 84,
+              decoration: BoxDecoration(
+                color: colors.surface,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: colors.line),
+              ),
+              child: Icon(Icons.add_photo_alternate_outlined,
+                  color: colors.subtle),
             ),
-            child:
-                Icon(Icons.add_photo_alternate_outlined, color: colors.subtle),
           ),
-        ),
         ...paths.map((path) => Stack(
               children: [
                 ClipRRect(

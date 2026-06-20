@@ -89,6 +89,38 @@ void main() {
     expect(PriceTier.signs(2), '\$\$');
   });
 
+  test('Chain fields round-trip and locationDescriptor falls back to address',
+      () {
+    final now = DateTime.now();
+    final chain = Restaurant(
+      id: 'c1',
+      name: 'Chipotle',
+      address: '123 Broadway, New York, NY',
+      isChain: true,
+      chainName: 'Chipotle',
+      locationLabel: 'Times Square',
+      createdAt: now,
+      updatedAt: now,
+    );
+    final restored = Restaurant.fromMap(chain.toMap());
+    expect(restored.isChain, true);
+    expect(restored.chainName, 'Chipotle');
+    expect(restored.locationLabel, 'Times Square');
+    expect(restored.locationDescriptor, 'Times Square');
+
+    // With no explicit label, descriptor falls back to first address part.
+    final noLabel = Restaurant(
+      id: 'c2',
+      name: 'Chipotle',
+      address: '123 Broadway, New York, NY',
+      isChain: true,
+      chainName: 'Chipotle',
+      createdAt: now,
+      updatedAt: now,
+    );
+    expect(noLabel.locationDescriptor, '123 Broadway');
+  });
+
   test('Empty visits give zeroed aggregates and null cover', () {
     final now = DateTime.now();
     final r = Restaurant(

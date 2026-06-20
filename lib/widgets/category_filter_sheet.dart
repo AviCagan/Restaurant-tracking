@@ -34,7 +34,11 @@ class _CategoryFilterSheetState extends State<CategoryFilterSheet> {
   Widget build(BuildContext context) {
     final colors = context.colors;
     return SafeArea(
-      child: Padding(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.8,
+        ),
+        child: Padding(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -65,10 +69,20 @@ class _CategoryFilterSheetState extends State<CategoryFilterSheet> {
                   ),
               ],
             ),
-            const SizedBox(height: 12),
-            CategorySelector(
-              selected: _selected,
-              onChanged: (s) => setState(() => _selected = s),
+            const SizedBox(height: 4),
+            Text(
+              'Tap to filter · long-press to delete · use Add to create your own',
+              style: TextStyle(fontSize: 11.5, color: colors.subtle),
+            ),
+            const SizedBox(height: 14),
+            Flexible(
+              child: SingleChildScrollView(
+                child: CategorySelector(
+                  selected: _selected,
+                  editable: true,
+                  onChanged: (s) => setState(() => _selected = s),
+                ),
+              ),
             ),
             const SizedBox(height: 22),
             SizedBox(
@@ -92,6 +106,7 @@ class _CategoryFilterSheetState extends State<CategoryFilterSheet> {
             ),
           ],
         ),
+      ),
       ),
     );
   }

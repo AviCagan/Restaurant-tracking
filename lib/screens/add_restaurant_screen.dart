@@ -6,7 +6,9 @@ import 'package:image_picker/image_picker.dart';
 import 'package:uuid/uuid.dart';
 
 import '../config.dart';
+import '../data/category_store.dart';
 import '../data/restaurant_database.dart';
+import '../models/category.dart';
 import '../models/restaurant.dart';
 import '../services/media_storage.dart';
 import '../services/places_service.dart';
@@ -34,6 +36,9 @@ class _AddRestaurantScreenState extends State<AddRestaurantScreen> {
 
   final _nameCtrl = TextEditingController();
   final _addressCtrl = TextEditingController();
+  final _chainCtrl = TextEditingController();
+  final _locationCtrl = TextEditingController();
+  bool _isChain = false;
 
   String? _placeId;
   double? _lat;
@@ -60,6 +65,9 @@ class _AddRestaurantScreenState extends State<AddRestaurantScreen> {
       _photoUrl = e.photoUrl;
       _customPhotoPath = e.customPhotoPath;
       _categories.addAll(e.categoryKeys);
+      _isChain = e.isChain;
+      _chainCtrl.text = e.chainName ?? '';
+      _locationCtrl.text = e.locationLabel ?? '';
     }
   }
 
@@ -67,7 +75,24 @@ class _AddRestaurantScreenState extends State<AddRestaurantScreen> {
   void dispose() {
     _nameCtrl.dispose();
     _addressCtrl.dispose();
+    _chainCtrl.dispose();
+    _locationCtrl.dispose();
     super.dispose();
+  }
+
+  void _toggleChain(bool on) {
+    setState(() {
+      _isChain = on;
+      if (on) {
+        if (_chainCtrl.text.trim().isEmpty) {
+          _chainCtrl.text = _nameCtrl.text.trim();
+        }
+        if (_locationCtrl.text.trim().isEmpty &&
+            _addressCtrl.text.contains(',')) {
+          _locationCtrl.text = _addressCtrl.text.split(',').first.trim();
+        }
+      }
+    });
   }
 
   void _onPlaceSelected(PlaceDetails d) {
@@ -115,6 +140,24 @@ class _AddRestaurantScreenState extends State<AddRestaurantScreen> {
     final now = DateTime.now();
     final e = widget.existing;
 
+    // For chains, ensure a shared category exists for the chain name and tag it.
+    final cats = {..._categories};
+    String? chainName;
+    String? locationLabel;
+    if (_isChain) {
+      chainName = _chainCtrl.text.trim().isEmpty
+          ? _nameCtrl.text.trim()
+          : _chainCtrl.text.trim();
+      if (chainName.isNotEmpty) {
+        final cat =
+            await CategoryStore.ensure(chainName, iconIndex: chainIconIndex);
+        cats.add(cat.key);
+      }
+      locationLabel = _locationCtrl.text.trim().isEmpty
+          ? null
+          : _locationCtrl.text.trim();
+    }
+
     final restaurant = Restaurant(
       id: e?.id ?? const Uuid().v4(),
       name: _nameCtrl.text.trim(),
@@ -124,10 +167,13 @@ class _AddRestaurantScreenState extends State<AddRestaurantScreen> {
       lng: _lng,
       photoUrl: _photoUrl,
       customPhotoPath: _customPhotoPath,
-      categoryKeys: _categories.toList(),
+      categoryKeys: cats.toList(),
       visits: _isEditing
           ? e!.visits
           : [_visitKey.currentState!.collect()],
+      isChain: _isChain,
+      chainName: _isChain ? chainName : null,
+      locationLabel: _isChain ? locationLabel : null,
       createdAt: e?.createdAt ?? now,
       updatedAt: now,
       ownerId: e?.ownerId,
@@ -239,6 +285,60 @@ class _AddRestaurantScreenState extends State<AddRestaurantScreen> {
                 ..clear()
                 ..addAll(s);
             }),
+          ),
+          const SizedBox(height: 28),
+
+          // ---- Chain ----
+          Container(
+            decoration: BoxDecoration(
+              color: colors.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: colors.line),
+            ),
+            child: Column(
+              children: [
+                SwitchListTile(
+                  value: _isChain,
+                  onChanged: _toggleChain,
+                  activeThumbColor: AppTheme.accent,
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 16),
+                  title: const Text('Part of a chain',
+                      style: TextStyle(fontWeight: FontWeight.w700)),
+                  subtitle: Text(
+                    'Groups all locations under one category',
+                    style: TextStyle(fontSize: 12, color: colors.subtle),
+                  ),
+                  secondary:
+                      Icon(Icons.storefront_outlined, color: colors.subtle),
+                ),
+                if (_isChain)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                    child: Column(
+                      children: [
+                        TextField(
+                          controller: _chainCtrl,
+                          textCapitalization: TextCapitalization.words,
+                          decoration: const InputDecoration(
+                            labelText: 'Chain name',
+                            hintText: 'e.g. Chipotle',
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: _locationCtrl,
+                          textCapitalization: TextCapitalization.words,
+                          decoration: const InputDecoration(
+                            labelText: 'This location',
+                            hintText: 'e.g. Times Square',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
           ),
           const SizedBox(height: 28),
 
