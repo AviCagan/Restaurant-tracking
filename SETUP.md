@@ -5,7 +5,7 @@
 1. Go to https://console.cloud.google.com/ and sign in.
 2. Create a project (top bar → project dropdown → **New Project**).
 3. **APIs & Services → Library** → enable:
-   - **Places API** (or "Places API (New)")
+   - **Places API (New)** — required (the app uses the new `places.googleapis.com/v1` API)
    - **Maps SDK for Android** (only needed if we add a real map later)
 4. **APIs & Services → Credentials → Create Credentials → API key** → copy it.
 5. **Billing**: link a billing account when prompted. There's a large free

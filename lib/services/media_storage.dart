@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
@@ -25,5 +26,21 @@ class MediaStorage {
     final dest = p.join(dir.path, '${_uuid.v4()}$ext');
     await File(sourcePath).copy(dest);
     return dest;
+  }
+
+  /// Downloads an image [url] (e.g. a Google Place photo) into permanent
+  /// storage and returns the local path, or null on failure. Follows
+  /// redirects automatically.
+  static Future<String?> downloadToFile(String url) async {
+    try {
+      final res = await http.get(Uri.parse(url));
+      if (res.statusCode != 200 || res.bodyBytes.isEmpty) return null;
+      final dir = await _mediaDir();
+      final dest = p.join(dir.path, '${_uuid.v4()}.jpg');
+      await File(dest).writeAsBytes(res.bodyBytes);
+      return dest;
+    } catch (_) {
+      return null;
+    }
   }
 }

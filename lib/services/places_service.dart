@@ -38,12 +38,12 @@ class PlaceDetails {
   });
 }
 
-/// Thin wrapper over the Google Places REST API.
+/// Wrapper over the **Places API (New)** — `places.googleapis.com/v1`.
 ///
-/// Uses a session token across autocomplete -> details to get the
-/// cheaper "per session" billing.
+/// Uses a session token across autocomplete -> details for the cheaper
+/// "per session" billing.
 class PlacesService {
-  static const _base = 'https://maps.googleapis.com/maps/api/place';
+  static const _base = 'https://places.googleapis.com/v1';
   final String _apiKey = AppConfig.googleMapsApiKey;
 
   String _sessionToken = const Uuid().v4();
@@ -56,85 +56,95 @@ class PlacesService {
   Future<List<PlacePrediction>> autocomplete(String input) async {
     if (!enabled || input.trim().isEmpty) return [];
 
-    final uri = Uri.parse('$_base/autocomplete/json').replace(
-      queryParameters: {
-        'input': input,
-        'key': _apiKey,
-        'sessiontoken': _sessionToken,
-        // Bias toward restaurants/places but still allow address text.
-        'types': 'establishment',
+    final uri = Uri.parse('$_base/places:autocomplete');
+    final res = await http.post(
+      uri,
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Goog-Api-Key': _apiKey,
       },
+      body: jsonEncode({
+        'input': input,
+        'sessionToken': _sessionToken,
+      }),
     );
 
-    final res = await http.get(uri);
-    if (res.statusCode != 200) return [];
-
-    final body = jsonDecode(res.body) as Map<String, dynamic>;
-    final status = body['status'] as String?;
-    if (status != 'OK' && status != 'ZERO_RESULTS') {
-      // Surface API errors during development.
+    if (res.statusCode != 200) {
       // ignore: avoid_print
-      print('Places autocomplete error: $status ${body['error_message']}');
+      print('Places autocomplete error ${res.statusCode}: ${res.body}');
       return [];
     }
 
-    final preds = (body['predictions'] as List? ?? []);
-    return preds.map((p) {
-      final structured = p['structured_formatting'] as Map<String, dynamic>?;
-      return PlacePrediction(
-        placeId: p['place_id'] as String,
-        mainText: structured?['main_text'] as String? ??
-            p['description'] as String? ??
-            '',
-        secondaryText: structured?['secondary_text'] as String? ?? '',
-      );
-    }).toList();
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    final suggestions = body['suggestions'] as List? ?? [];
+
+    final out = <PlacePrediction>[];
+    for (final s in suggestions) {
+      final pp = (s as Map<String, dynamic>)['placePrediction']
+          as Map<String, dynamic>?;
+      if (pp == null) continue;
+      final structured = pp['structuredFormat'] as Map<String, dynamic>?;
+      final mainText = (structured?['mainText']
+              as Map<String, dynamic>?)?['text'] as String? ??
+          (pp['text'] as Map<String, dynamic>?)?['text'] as String? ??
+          '';
+      final secondaryText = (structured?['secondaryText']
+              as Map<String, dynamic>?)?['text'] as String? ??
+          '';
+      out.add(PlacePrediction(
+        placeId: pp['placeId'] as String? ?? '',
+        mainText: mainText,
+        secondaryText: secondaryText,
+      ));
+    }
+    return out;
   }
 
   Future<PlaceDetails?> details(String placeId) async {
-    if (!enabled) return null;
+    if (!enabled || placeId.isEmpty) return null;
 
-    final uri = Uri.parse('$_base/details/json').replace(
-      queryParameters: {
-        'place_id': placeId,
-        'key': _apiKey,
-        'sessiontoken': _sessionToken,
-        'fields': 'name,formatted_address,geometry,photos',
-      },
+    final uri = Uri.parse('$_base/places/$placeId').replace(
+      queryParameters: {'sessionToken': _sessionToken},
     );
+    final res = await http.get(uri, headers: {
+      'X-Goog-Api-Key': _apiKey,
+      'X-Goog-FieldMask':
+          'id,displayName,formattedAddress,location,photos',
+    });
 
-    final res = await http.get(uri);
     // Selecting a place ends the billing session.
     newSession();
 
-    if (res.statusCode != 200) return null;
+    if (res.statusCode != 200) {
+      // ignore: avoid_print
+      print('Places details error ${res.statusCode}: ${res.body}');
+      return null;
+    }
 
     final body = jsonDecode(res.body) as Map<String, dynamic>;
-    if (body['status'] != 'OK') return null;
-
-    final result = body['result'] as Map<String, dynamic>;
-    final geometry = result['geometry'] as Map<String, dynamic>?;
-    final location = geometry?['location'] as Map<String, dynamic>?;
+    final location = body['location'] as Map<String, dynamic>?;
 
     String? photoUrl;
-    final photos = result['photos'] as List?;
+    final photos = body['photos'] as List?;
     if (photos != null && photos.isNotEmpty) {
-      final ref = photos.first['photo_reference'] as String?;
-      if (ref != null) photoUrl = photoUrlFor(ref);
+      final name = (photos.first as Map<String, dynamic>)['name'] as String?;
+      if (name != null) photoUrl = photoUrlForName(name);
     }
 
     return PlaceDetails(
-      name: result['name'] as String? ?? '',
-      address: result['formatted_address'] as String? ?? '',
-      lat: (location?['lat'] as num?)?.toDouble(),
-      lng: (location?['lng'] as num?)?.toDouble(),
+      name: (body['displayName']
+              as Map<String, dynamic>?)?['text'] as String? ??
+          '',
+      address: body['formattedAddress'] as String? ?? '',
+      lat: (location?['latitude'] as num?)?.toDouble(),
+      lng: (location?['longitude'] as num?)?.toDouble(),
       photoUrl: photoUrl,
     );
   }
 
-  /// Build a directly-loadable Place Photo URL.
-  String photoUrlFor(String photoReference, {int maxWidth = 800}) {
-    return '$_base/photo?maxwidth=$maxWidth'
-        '&photo_reference=$photoReference&key=$_apiKey';
+  /// Build a directly-loadable Place Photo URL from a photo resource name
+  /// like `places/PLACE_ID/photos/PHOTO_REF`.
+  String photoUrlForName(String photoName, {int maxWidth = 800}) {
+    return '$_base/$photoName/media?maxWidthPx=$maxWidth&key=$_apiKey';
   }
 }

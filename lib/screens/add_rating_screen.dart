@@ -53,6 +53,7 @@ class _AddRatingScreenState extends State<AddRatingScreen> {
   final List<String> _mediaPaths = [];
 
   bool _saving = false;
+  bool _downloadingCover = false;
 
   bool get _isEditing => widget.existing != null;
 
@@ -95,9 +96,24 @@ class _AddRatingScreenState extends State<AddRatingScreen> {
       _addressCtrl.text = d.address;
       _lat = d.lat;
       _lng = d.lng;
-      _photoUrl = d.photoUrl;
+      _photoUrl = d.photoUrl; // shown immediately while we download a copy
       // A newly selected place replaces a previous custom cover.
       _customPhotoPath = null;
+      _downloadingCover = d.photoUrl != null;
+    });
+    if (d.photoUrl != null) _downloadCover(d.photoUrl!);
+  }
+
+  /// Google photo tokens rotate, so we download a permanent local copy.
+  Future<void> _downloadCover(String url) async {
+    final local = await MediaStorage.downloadToFile(url);
+    if (!mounted) return;
+    setState(() {
+      if (local != null) {
+        _customPhotoPath = local;
+        _photoUrl = null;
+      }
+      _downloadingCover = false;
     });
   }
 
@@ -207,6 +223,7 @@ class _AddRatingScreenState extends State<AddRatingScreen> {
           _CoverPreview(
             networkUrl: _photoUrl,
             localPath: _customPhotoPath,
+            loading: _downloadingCover,
             onPick: _pickCover,
           ),
           const SizedBox(height: 20),
@@ -381,11 +398,13 @@ class _CoverPreview extends StatelessWidget {
   const _CoverPreview({
     required this.networkUrl,
     required this.localPath,
+    required this.loading,
     required this.onPick,
   });
 
   final String? networkUrl;
   final String? localPath;
+  final bool loading;
   final VoidCallback onPick;
 
   @override
@@ -430,6 +449,13 @@ class _CoverPreview extends StatelessWidget {
           fit: StackFit.expand,
           children: [
             content,
+            if (loading)
+              Container(
+                color: Colors.black.withOpacity(0.25),
+                child: const Center(
+                  child: CircularProgressIndicator(color: Colors.white),
+                ),
+              ),
             if (hasLocal || hasNetwork)
               Positioned(
                 right: 10,
