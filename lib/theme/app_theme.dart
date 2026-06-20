@@ -1,48 +1,115 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-/// Sleek, modern, low-clutter theme.
+/// Semantic colors that adapt between light and dark themes.
+///
+/// Widgets read these via `context.colors.subtle` etc. The brand [accent]
+/// stays constant across themes and lives on [AppTheme].
+@immutable
+class AppColors extends ThemeExtension<AppColors> {
+  final Color ink; // primary text
+  final Color subtle; // secondary text / icons
+  final Color line; // borders / dividers
+  final Color surface; // cards
+  final Color background; // scaffold
+
+  const AppColors({
+    required this.ink,
+    required this.subtle,
+    required this.line,
+    required this.surface,
+    required this.background,
+  });
+
+  @override
+  AppColors copyWith({
+    Color? ink,
+    Color? subtle,
+    Color? line,
+    Color? surface,
+    Color? background,
+  }) =>
+      AppColors(
+        ink: ink ?? this.ink,
+        subtle: subtle ?? this.subtle,
+        line: line ?? this.line,
+        surface: surface ?? this.surface,
+        background: background ?? this.background,
+      );
+
+  @override
+  AppColors lerp(ThemeExtension<AppColors>? other, double t) {
+    if (other is! AppColors) return this;
+    return AppColors(
+      ink: Color.lerp(ink, other.ink, t)!,
+      subtle: Color.lerp(subtle, other.subtle, t)!,
+      line: Color.lerp(line, other.line, t)!,
+      surface: Color.lerp(surface, other.surface, t)!,
+      background: Color.lerp(background, other.background, t)!,
+    );
+  }
+
+  static const light = AppColors(
+    ink: Color(0xFF1A1A1F),
+    subtle: Color(0xFF8A8A93),
+    line: Color(0xFFECECEF),
+    surface: Color(0xFFFFFFFF),
+    background: Color(0xFFF6F6F8),
+  );
+
+  static const dark = AppColors(
+    ink: Color(0xFFF1F1F4),
+    subtle: Color(0xFF9A9AA4),
+    line: Color(0xFF2C2C34),
+    surface: Color(0xFF1B1B21),
+    background: Color(0xFF0E0E12),
+  );
+}
+
+extension AppColorsX on BuildContext {
+  AppColors get colors => Theme.of(this).extension<AppColors>()!;
+}
+
+/// Sleek, modern, low-clutter theme (light + dark).
 class AppTheme {
-  // Core palette — a warm, appetizing accent on clean neutrals.
   static const Color accent = Color(0xFFFF5A5F); // coral
   static const Color accentDark = Color(0xFFE0484D);
-  static const Color ink = Color(0xFF1A1A1F);
-  static const Color subtle = Color(0xFF8A8A93);
-  static const Color surface = Color(0xFFFFFFFF);
-  static const Color background = Color(0xFFF6F6F8);
-  static const Color line = Color(0xFFECECEF);
 
-  static ThemeData get light {
-    final base = ThemeData.light(useMaterial3: true);
+  static ThemeData get light => _build(Brightness.light, AppColors.light);
+  static ThemeData get dark => _build(Brightness.dark, AppColors.dark);
+
+  static ThemeData _build(Brightness brightness, AppColors c) {
+    final base = ThemeData(brightness: brightness, useMaterial3: true);
     final textTheme = GoogleFonts.interTextTheme(base.textTheme).apply(
-      bodyColor: ink,
-      displayColor: ink,
+      bodyColor: c.ink,
+      displayColor: c.ink,
     );
 
     return base.copyWith(
-      scaffoldBackgroundColor: background,
+      scaffoldBackgroundColor: c.background,
       colorScheme: base.colorScheme.copyWith(
         primary: accent,
         secondary: accent,
-        surface: surface,
-        onSurface: ink,
+        surface: c.surface,
+        onSurface: c.ink,
       ),
+      extensions: [c],
       textTheme: textTheme,
       appBarTheme: AppBarTheme(
-        backgroundColor: background,
+        backgroundColor: c.background,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         centerTitle: false,
         titleTextStyle: GoogleFonts.inter(
-          color: ink,
+          color: c.ink,
           fontSize: 28,
           fontWeight: FontWeight.w800,
           letterSpacing: -0.5,
         ),
-        iconTheme: const IconThemeData(color: ink),
+        iconTheme: IconThemeData(color: c.ink),
       ),
       cardTheme: CardThemeData(
-        color: surface,
+        color: c.surface,
         elevation: 0,
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -54,17 +121,17 @@ class AppTheme {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: surface,
+        fillColor: c.surface,
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-        hintStyle: const TextStyle(color: subtle),
+        hintStyle: TextStyle(color: c.subtle),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: line),
+          borderSide: BorderSide(color: c.line),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: line),
+          borderSide: BorderSide(color: c.line),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
@@ -72,23 +139,25 @@ class AppTheme {
         ),
       ),
       chipTheme: base.chipTheme.copyWith(
-        backgroundColor: surface,
-        side: const BorderSide(color: line),
-        labelStyle: const TextStyle(
-            color: ink, fontWeight: FontWeight.w600, fontSize: 13),
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+        backgroundColor: c.surface,
+        side: BorderSide(color: c.line),
+        labelStyle: TextStyle(
+            color: c.ink, fontWeight: FontWeight.w600, fontSize: 13),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
       ),
-      dividerTheme: const DividerThemeData(color: line, thickness: 1),
+      dividerTheme: DividerThemeData(color: c.line, thickness: 1),
     );
   }
 
-  /// Soft shadow used on cards.
-  static List<BoxShadow> get cardShadow => [
-        BoxShadow(
-          color: Colors.black.withValues(alpha: 0.06),
-          blurRadius: 18,
-          offset: const Offset(0, 8),
-        ),
-      ];
+  /// Soft shadow used on cards (subtle in both themes).
+  static List<BoxShadow> shadow(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return [
+      BoxShadow(
+        color: Colors.black.withValues(alpha: dark ? 0.25 : 0.06),
+        blurRadius: 18,
+        offset: const Offset(0, 8),
+      ),
+    ];
+  }
 }

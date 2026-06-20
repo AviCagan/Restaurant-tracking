@@ -51,31 +51,29 @@ class _Chip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
         decoration: BoxDecoration(
-          color: selected ? AppTheme.accent : AppTheme.surface,
+          color: selected ? AppTheme.accent : colors.surface,
           borderRadius: BorderRadius.circular(30),
-          border: Border.all(
-            color: selected ? AppTheme.accent : AppTheme.line,
-          ),
+          border: Border.all(color: selected ? AppTheme.accent : colors.line),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(icon,
-                size: 16,
-                color: selected ? Colors.white : AppTheme.subtle),
+                size: 16, color: selected ? Colors.white : colors.subtle),
             const SizedBox(width: 6),
             Text(
               label,
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
-                color: selected ? Colors.white : AppTheme.ink,
+                color: selected ? Colors.white : colors.ink,
               ),
             ),
           ],

@@ -6,9 +6,11 @@ import '../models/restaurant.dart';
 import '../models/sort_option.dart';
 import '../services/location_service.dart';
 import '../theme/app_theme.dart';
+import '../theme/theme_controller.dart';
 import '../widgets/restaurant_card.dart';
 import '../widgets/sort_sheet.dart';
-import 'add_rating_screen.dart';
+import 'add_restaurant_screen.dart';
+import 'add_visit_screen.dart';
 import 'restaurant_detail_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -20,14 +22,15 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final _db = RestaurantDatabase.instance;
+  final _searchCtrl = TextEditingController();
 
   List<Restaurant> _all = [];
   bool _loading = true;
 
   SortOption _sort = SortOption.newest;
   final Set<FoodCategory> _activeFilters = {};
+  String _query = '';
 
-  // Current location cache for distance sorting.
   double? _myLat;
   double? _myLng;
 
@@ -35,6 +38,12 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -50,7 +59,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _openAdd() async {
     final created = await Navigator.push<bool>(
       context,
-      MaterialPageRoute(builder: (_) => const AddRatingScreen()),
+      MaterialPageRoute(builder: (_) => const AddRestaurantScreen()),
     );
     if (created == true) _load();
   }
@@ -63,18 +72,32 @@ class _HomeScreenState extends State<HomeScreen> {
     if (changed == true) _load();
   }
 
+  Future<void> _quickAddVisit(Restaurant r) async {
+    final added = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => AddVisitScreen(restaurant: r)),
+    );
+    if (added == true) {
+      _load();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Visit added to ${r.name}')),
+        );
+      }
+    }
+  }
+
   Future<void> _pickSort() async {
     final chosen = await SortSheet.show(context, _sort);
     if (chosen == null) return;
-
     if (chosen.needsLocation && (_myLat == null || _myLng == null)) {
       final pos = await LocationService.current();
       if (pos == null) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-                content:
-                    Text('Location unavailable — enable location to sort by distance.')),
+                content: Text(
+                    'Location unavailable — enable location to sort by distance.')),
           );
         }
         return;
@@ -93,11 +116,14 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   List<Restaurant> get _visible {
+    final q = _query.trim().toLowerCase();
     var list = _all.where((r) {
-      if (_activeFilters.isEmpty) return true;
-      // Show restaurants that match ANY active filter.
-      return r.categoryKeys
-          .any((k) => _activeFilters.any((f) => f.key == k));
+      final matchesFilter = _activeFilters.isEmpty ||
+          r.categoryKeys.any((k) => _activeFilters.any((f) => f.key == k));
+      final matchesQuery = q.isEmpty ||
+          r.name.toLowerCase().contains(q) ||
+          r.address.toLowerCase().contains(q);
+      return matchesFilter && matchesQuery;
     }).toList();
 
     int byName(Restaurant a, Restaurant b) =>
@@ -114,10 +140,10 @@ class _HomeScreenState extends State<HomeScreen> {
         list.sort((a, b) => a.overallRating.compareTo(b.overallRating));
         break;
       case SortOption.priceLow:
-        list.sort((a, b) => a.price.compareTo(b.price));
+        list.sort((a, b) => a.avgPrice.compareTo(b.avgPrice));
         break;
       case SortOption.priceHigh:
-        list.sort((a, b) => b.price.compareTo(a.price));
+        list.sort((a, b) => b.avgPrice.compareTo(a.avgPrice));
         break;
       case SortOption.nameAZ:
         list.sort(byName);
@@ -141,8 +167,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     final visible = _visible;
     final showDistance = _sort.needsLocation;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       floatingActionButton: _AddButton(onTap: _openAdd),
@@ -151,7 +179,7 @@ class _HomeScreenState extends State<HomeScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 12, 4),
+              padding: const EdgeInsets.fromLTRB(20, 12, 8, 4),
               child: Row(
                 children: [
                   const Expanded(
@@ -160,11 +188,39 @@ class _HomeScreenState extends State<HomeScreen> {
                             fontSize: 30, fontWeight: FontWeight.w800)),
                   ),
                   IconButton(
+                    onPressed: () => ThemeController.toggle(context),
+                    icon: Icon(isDark
+                        ? Icons.light_mode_outlined
+                        : Icons.dark_mode_outlined),
+                    tooltip: 'Toggle theme',
+                  ),
+                  IconButton(
                     onPressed: _pickSort,
                     icon: const Icon(Icons.swap_vert_rounded),
                     tooltip: 'Sort',
                   ),
                 ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+              child: TextField(
+                controller: _searchCtrl,
+                onChanged: (v) => setState(() => _query = v),
+                decoration: InputDecoration(
+                  hintText: 'Search your restaurants…',
+                  prefixIcon: Icon(Icons.search, color: colors.subtle),
+                  contentPadding: EdgeInsets.zero,
+                  suffixIcon: _query.isEmpty
+                      ? null
+                      : IconButton(
+                          icon: const Icon(Icons.close, size: 18),
+                          onPressed: () {
+                            _searchCtrl.clear();
+                            setState(() => _query = '');
+                          },
+                        ),
+                ),
               ),
             ),
             _FilterBar(
@@ -182,8 +238,7 @@ class _HomeScreenState extends State<HomeScreen> {
               child: _loading
                   ? const Center(child: CircularProgressIndicator())
                   : visible.isEmpty
-                      ? _EmptyState(
-                          filtered: _activeFilters.isNotEmpty || _all.isNotEmpty)
+                      ? _EmptyState(filtered: _all.isNotEmpty)
                       : RefreshIndicator(
                           onRefresh: _load,
                           child: ListView.separated(
@@ -199,6 +254,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 distanceMeters:
                                     showDistance ? _distanceTo(r) : null,
                                 onTap: () => _openDetail(r),
+                                onLongPress: () => _quickAddVisit(r),
                               );
                             },
                           ),
@@ -219,6 +275,7 @@ class _FilterBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     return SizedBox(
       height: 42,
       child: ListView.separated(
@@ -236,22 +293,21 @@ class _FilterBar extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 14),
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: on ? AppTheme.accent : AppTheme.surface,
+                color: on ? AppTheme.accent : colors.surface,
                 borderRadius: BorderRadius.circular(30),
-                border: Border.all(color: on ? AppTheme.accent : AppTheme.line),
+                border: Border.all(color: on ? AppTheme.accent : colors.line),
               ),
               child: Row(
                 children: [
                   Icon(c.icon,
-                      size: 15,
-                      color: on ? Colors.white : AppTheme.subtle),
+                      size: 15, color: on ? Colors.white : colors.subtle),
                   const SizedBox(width: 6),
                   Text(
                     c.label,
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
-                      color: on ? Colors.white : AppTheme.ink,
+                      color: on ? Colors.white : colors.ink,
                     ),
                   ),
                 ],
@@ -308,27 +364,27 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(40),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.ramen_dining_outlined,
-                size: 64, color: AppTheme.subtle),
+            Icon(Icons.ramen_dining_outlined, size: 64, color: colors.subtle),
             const SizedBox(height: 16),
             Text(
-              filtered
-                  ? 'No restaurants match this filter'
-                  : 'No ratings yet',
+              filtered ? 'No matches' : 'No ratings yet',
               style:
                   const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 6),
-            const Text(
-              'Tap the + button to rate your first spot.',
+            Text(
+              filtered
+                  ? 'Try a different search or filter.'
+                  : 'Tap the + button to rate your first spot.',
               textAlign: TextAlign.center,
-              style: TextStyle(color: AppTheme.subtle),
+              style: TextStyle(color: colors.subtle),
             ),
           ],
         ),

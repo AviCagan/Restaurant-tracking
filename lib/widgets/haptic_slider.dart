@@ -31,8 +31,6 @@ class HapticSlider extends StatefulWidget {
   final int step;
   final SliderHaptic haptic;
   final ValueChanged<int> onChanged;
-
-  /// Custom formatter for the big value chip (e.g. add a "$").
   final String Function(int)? valueLabelBuilder;
   final Color accent;
 
@@ -41,13 +39,7 @@ class HapticSlider extends StatefulWidget {
 }
 
 class _HapticSliderState extends State<HapticSlider> {
-  late int _lastStep;
-
-  @override
-  void initState() {
-    super.initState();
-    _lastStep = widget.value;
-  }
+  late int _lastStep = widget.value;
 
   void _fireHaptic() {
     switch (widget.haptic) {
@@ -61,7 +53,6 @@ class _HapticSliderState extends State<HapticSlider> {
   }
 
   void _handleChange(double raw) {
-    // Snap to the nearest step.
     var clamped = (raw / widget.step).round() * widget.step;
     if (clamped < widget.min) clamped = widget.min;
     if (clamped > widget.max) clamped = widget.max;
@@ -74,9 +65,14 @@ class _HapticSliderState extends State<HapticSlider> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     final divisions = ((widget.max - widget.min) / widget.step).round();
-    final valueText = widget.valueLabelBuilder?.call(widget.value) ??
-        widget.value.toString();
+    final valueText =
+        widget.valueLabelBuilder?.call(widget.value) ?? widget.value.toString();
+    // The slider position is clamped to its range even if value exceeds it
+    // (e.g. a custom price above the 500 quick-pick max).
+    final sliderValue =
+        widget.value.clamp(widget.min, widget.max).toDouble();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -88,18 +84,14 @@ class _HapticSliderState extends State<HapticSlider> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    widget.label,
-                    style: const TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.w700),
-                  ),
+                  Text(widget.label,
+                      style: const TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.w700)),
                   if (widget.subtitle != null) ...[
                     const SizedBox(height: 2),
-                    Text(
-                      widget.subtitle!,
-                      style: const TextStyle(
-                          fontSize: 12, color: AppTheme.subtle, height: 1.3),
-                    ),
+                    Text(widget.subtitle!,
+                        style: TextStyle(
+                            fontSize: 12, color: colors.subtle, height: 1.3)),
                   ],
                 ],
               ),
@@ -112,14 +104,11 @@ class _HapticSliderState extends State<HapticSlider> {
                 color: widget.accent.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Text(
-                valueText,
-                style: TextStyle(
-                  color: widget.accent,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 18,
-                ),
-              ),
+              child: Text(valueText,
+                  style: TextStyle(
+                      color: widget.accent,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 18)),
             ),
           ],
         ),
@@ -130,12 +119,11 @@ class _HapticSliderState extends State<HapticSlider> {
             thumbColor: widget.accent,
             overlayColor: widget.accent.withValues(alpha: 0.15),
             trackHeight: 5,
-            thumbShape:
-                const RoundSliderThumbShape(enabledThumbRadius: 11),
+            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 11),
             showValueIndicator: ShowValueIndicator.never,
           ),
           child: Slider(
-            value: widget.value.toDouble(),
+            value: sliderValue,
             min: widget.min.toDouble(),
             max: widget.max.toDouble(),
             divisions: divisions,

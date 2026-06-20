@@ -2,12 +2,15 @@ import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 import '../data/restaurant_database.dart';
 import '../models/category.dart';
 import '../models/restaurant.dart';
+import '../models/visit.dart';
 import '../theme/app_theme.dart';
-import 'add_rating_screen.dart';
+import 'add_restaurant_screen.dart';
+import 'add_visit_screen.dart';
 
 class RestaurantDetailScreen extends StatefulWidget {
   const RestaurantDetailScreen({super.key, required this.restaurant});
@@ -19,69 +22,106 @@ class RestaurantDetailScreen extends StatefulWidget {
 }
 
 class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
+  final _db = RestaurantDatabase.instance;
   late Restaurant _r = widget.restaurant;
   bool _changed = false;
 
-  Future<void> _edit() async {
-    final updated = await Navigator.push<bool>(
-      context,
-      MaterialPageRoute(builder: (_) => AddRatingScreen(existing: _r)),
-    );
-    if (updated == true) {
-      // Reload the freshest copy.
-      final all = await RestaurantDatabase.instance.getAll();
-      Restaurant? fresh;
-      for (final e in all) {
-        if (e.id == _r.id) {
-          fresh = e;
-          break;
-        }
-      }
-      if (fresh != null && mounted) {
-        setState(() {
-          _r = fresh!;
-          _changed = true;
-        });
-      }
+  Future<void> _reload() async {
+    final fresh = await _db.getById(_r.id);
+    if (fresh != null && mounted) {
+      setState(() {
+        _r = fresh;
+        _changed = true;
+      });
     }
   }
 
-  Future<void> _delete() async {
-    final confirm = await showDialog<bool>(
+  Future<void> _editIdentity() async {
+    final updated = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => AddRestaurantScreen(existing: _r)),
+    );
+    if (updated == true) _reload();
+  }
+
+  Future<void> _addVisit() async {
+    final added = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => AddVisitScreen(restaurant: _r)),
+    );
+    if (added == true) _reload();
+  }
+
+  Future<void> _editVisit(Visit v) async {
+    final updated = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+          builder: (_) => AddVisitScreen(restaurant: _r, visit: v)),
+    );
+    if (updated == true) _reload();
+  }
+
+  Future<void> _deleteVisit(Visit v) async {
+    final confirm = await _confirm('Delete this visit?',
+        'This removes one visit and recalculates the averages.');
+    if (confirm != true) return;
+    final visits = _r.visits.where((e) => e.id != v.id).toList();
+    await _db.upsert(_r.copyWith(visits: visits));
+    _reload();
+  }
+
+  Future<void> _deleteRestaurant() async {
+    final confirm = await _confirm(
+        'Delete restaurant?', 'Remove "${_r.name}" and all its visits?');
+    if (confirm == true) {
+      await _db.delete(_r.id);
+      if (mounted) Navigator.pop(context, true);
+    }
+  }
+
+  Future<bool?> _confirm(String title, String body) {
+    return showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Delete rating?'),
-        content: Text('Remove "${_r.name}" from your list?'),
+        title: Text(title),
+        content: Text(body),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context, false),
               child: const Text('Cancel')),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete',
-                style: TextStyle(color: AppTheme.accent)),
+            child: const Text('Delete', style: TextStyle(color: AppTheme.accent)),
           ),
         ],
       ),
     );
-    if (confirm == true) {
-      await RestaurantDatabase.instance.delete(_r.id);
-      if (mounted) Navigator.pop(context, true);
-    }
   }
+
+  String _fmt(double v) =>
+      v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(1);
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     final cover = _r.coverImage;
     final cats = FoodCategory.fromKeys(_r.categoryKeys);
+    final visits = [..._r.visits]..sort((a, b) => b.date.compareTo(a.date));
 
     return PopScope(
       canPop: false,
-      onPopInvokedWithResult: (didPop, result) {
+      onPopInvokedWithResult: (didPop, _) {
         if (didPop) return;
         Navigator.pop(context, _changed);
       },
       child: Scaffold(
+        floatingActionButton: FloatingActionButton.extended(
+          onPressed: _addVisit,
+          backgroundColor: AppTheme.accent,
+          icon: const Icon(Icons.add),
+          label: const Text('Add visit',
+              style: TextStyle(fontWeight: FontWeight.w800)),
+        ),
         body: SafeArea(
           top: false,
           child: CustomScrollView(
@@ -89,12 +129,13 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
               SliverAppBar(
                 expandedHeight: cover != null ? 240 : 0,
                 pinned: true,
-                backgroundColor: AppTheme.background,
+                backgroundColor: colors.background,
                 actions: [
                   IconButton(
-                      onPressed: _edit, icon: const Icon(Icons.edit_outlined)),
+                      onPressed: _editIdentity,
+                      icon: const Icon(Icons.edit_outlined)),
                   IconButton(
-                      onPressed: _delete,
+                      onPressed: _deleteRestaurant,
                       icon: const Icon(Icons.delete_outline)),
                 ],
                 flexibleSpace: cover == null
@@ -108,7 +149,7 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
               ),
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -117,29 +158,39 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
                               fontSize: 26, fontWeight: FontWeight.w800)),
                       const SizedBox(height: 6),
                       Text(_r.address,
-                          style: const TextStyle(
-                              color: AppTheme.subtle, fontSize: 14)),
+                          style: TextStyle(color: colors.subtle, fontSize: 14)),
                       const SizedBox(height: 20),
-                      Row(
-                        children: [
-                          _Stat(
-                              label: 'Food',
-                              value: '${_r.foodRating}/10'),
-                          _Stat(
-                              label: 'Atmosphere',
-                              value: '${_r.atmosphereRating}/10'),
-                          _Stat(label: 'Price', value: '\$${_r.price}'),
-                          _Stat(
-                              label: 'Overall',
-                              value: _r.overallRating
-                                  .toStringAsFixed(
-                                      _r.overallRating == _r.overallRating.roundToDouble()
-                                          ? 0
-                                          : 1)),
-                        ],
+
+                      // Aggregate stats (weighted across all visits)
+                      Container(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        decoration: BoxDecoration(
+                          color: colors.surface,
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(color: colors.line),
+                        ),
+                        child: Row(
+                          children: [
+                            _Stat(label: 'Food', value: _fmt(_r.avgFood)),
+                            _Stat(
+                                label: 'Atmos.',
+                                value: _fmt(_r.avgAtmosphere)),
+                            _Stat(
+                                label: 'Avg \$',
+                                value: '\$${_r.avgPrice.round()}'),
+                            _Stat(
+                                label: 'Overall',
+                                value: _fmt(_r.overallRating),
+                                highlight: true),
+                            _Stat(
+                                label: 'Visits',
+                                value: _r.visitCount.toString()),
+                          ],
+                        ),
                       ),
+
                       if (cats.isNotEmpty) ...[
-                        const SizedBox(height: 22),
+                        const SizedBox(height: 18),
                         Wrap(
                           spacing: 8,
                           runSpacing: 8,
@@ -151,35 +202,23 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
                               .toList(),
                         ),
                       ],
-                      if (_r.notes.isNotEmpty) ...[
-                        const SizedBox(height: 24),
-                        const Text('Notes',
-                            style: TextStyle(
-                                fontSize: 16, fontWeight: FontWeight.w800)),
-                        const SizedBox(height: 8),
-                        Text(_r.notes,
-                            style: const TextStyle(height: 1.4, fontSize: 14)),
-                      ],
-                      if (_r.mediaPaths.isNotEmpty) ...[
-                        const SizedBox(height: 24),
-                        const Text('Photos',
-                            style: TextStyle(
-                                fontSize: 16, fontWeight: FontWeight.w800)),
-                        const SizedBox(height: 12),
-                        Wrap(
-                          spacing: 10,
-                          runSpacing: 10,
-                          children: _r.mediaPaths.map((path) {
-                            return ClipRRect(
-                              borderRadius: BorderRadius.circular(14),
-                              child: Image.file(File(path),
-                                  width: 104,
-                                  height: 104,
-                                  fit: BoxFit.cover),
-                            );
-                          }).toList(),
-                        ),
-                      ],
+
+                      const SizedBox(height: 26),
+                      Text('Visits',
+                          style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                              color: colors.ink)),
+                      const SizedBox(height: 12),
+                      if (visits.isEmpty)
+                        Text('No visits yet — tap "Add visit".',
+                            style: TextStyle(color: colors.subtle))
+                      else
+                        ...visits.map((v) => _VisitCard(
+                              visit: v,
+                              onEdit: () => _editVisit(v),
+                              onDelete: () => _deleteVisit(v),
+                            )),
                     ],
                   ),
                 ),
@@ -193,22 +232,159 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
 }
 
 class _Stat extends StatelessWidget {
-  const _Stat({required this.label, required this.value});
+  const _Stat(
+      {required this.label, required this.value, this.highlight = false});
+  final String label;
+  final String value;
+  final bool highlight;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return Expanded(
+      child: Column(
+        children: [
+          Text(value,
+              style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: highlight ? AppTheme.accent : colors.ink)),
+          const SizedBox(height: 2),
+          Text(label,
+              style: TextStyle(fontSize: 11.5, color: colors.subtle)),
+        ],
+      ),
+    );
+  }
+}
+
+class _VisitCard extends StatelessWidget {
+  const _VisitCard({
+    required this.visit,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  final Visit visit;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final date = DateFormat.yMMMd().format(visit.date);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: colors.line),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(date,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w800, fontSize: 14)),
+              const Spacer(),
+              _MiniStat(label: 'Food', value: '${visit.foodRating}'),
+              _MiniStat(label: 'Atmos', value: '${visit.atmosphereRating}'),
+              _MiniStat(label: '\$', value: '${visit.price}'),
+              PopupMenuButton<String>(
+                padding: EdgeInsets.zero,
+                onSelected: (v) => v == 'edit' ? onEdit() : onDelete(),
+                itemBuilder: (_) => const [
+                  PopupMenuItem(value: 'edit', child: Text('Edit')),
+                  PopupMenuItem(value: 'delete', child: Text('Delete')),
+                ],
+                icon: Icon(Icons.more_horiz, color: colors.subtle),
+              ),
+            ],
+          ),
+          if (visit.items.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            ...visit.items.map((it) => Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Row(
+                    children: [
+                      Icon(Icons.circle, size: 5, color: colors.subtle),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(it.name,
+                            style: const TextStyle(fontSize: 13.5)),
+                      ),
+                      if (it.price != null)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 10),
+                          child: Text('\$${it.price}',
+                              style: TextStyle(
+                                  fontSize: 12.5, color: colors.subtle)),
+                        ),
+                      if (it.rating != null)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppTheme.accent.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text('${it.rating}/10',
+                              style: const TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppTheme.accent)),
+                        ),
+                    ],
+                  ),
+                )),
+          ],
+          if (visit.notes.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(visit.notes,
+                style: TextStyle(
+                    fontSize: 13, color: colors.subtle, height: 1.35)),
+          ],
+          if (visit.photoPaths.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: visit.photoPaths
+                  .map((p) => ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image.file(File(p),
+                            width: 72, height: 72, fit: BoxFit.cover),
+                      ))
+                  .toList(),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _MiniStat extends StatelessWidget {
+  const _MiniStat({required this.label, required this.value});
   final String label;
   final String value;
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
+    final colors = context.colors;
+    return Padding(
+      padding: const EdgeInsets.only(right: 12),
       child: Column(
         children: [
           Text(value,
               style: const TextStyle(
-                  fontSize: 18, fontWeight: FontWeight.w800)),
-          const SizedBox(height: 2),
+                  fontWeight: FontWeight.w800, fontSize: 14)),
           Text(label,
-              style: const TextStyle(
-                  fontSize: 12, color: AppTheme.subtle)),
+              style: TextStyle(fontSize: 10, color: colors.subtle)),
         ],
       ),
     );

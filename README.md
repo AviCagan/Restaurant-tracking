@@ -12,22 +12,27 @@ Google Maps photos, and powerful sorting/filtering.
 
 ## ✨ Features (Phase 1)
 
-- **List of ratings** — Google Maps photo on the left, name in big text,
-  address below, overall score on the right.
+- **Light & dark mode** — follows the system, with a manual toggle (remembered).
+- **List of restaurants** — Google Maps photo on the left, name in big text,
+  address below, **averaged** overall score on the right, plus visit-count &
+  average-price pills.
+- **Search** your restaurants by name/address.
 - **Sort** by newest, rating (high/low), price (low/high), name (A–Z / Z–A),
   and **distance** (nearest/farthest, uses your location).
 - **Filter** by category: Kosher (Dairy / Meat), Fast Food, Fancy, Mexican,
   Chinese, Vegan, Healthy.
-- **Add rating** via a clean form:
-  - Restaurant name
-  - **Google Places address autocomplete** → auto-fills the photo (swappable
-    for a custom photo)
-  - **3 haptic sliders:**
-    - **Food** (1–10) — heavy haptic tick on each number
-    - **Atmosphere** (1–10) — heavy haptic tick (service, style, seating…)
-    - **Price** (1–500, steps of 10) — light haptic tick + an exact-amount box
-  - Photo upload
-  - Notes
+- **Name-first add flow** — type the restaurant name, pick the matching place
+  to confirm/lock in the address + auto-fetched photo (swap for a custom one).
+- **Visits** — each restaurant holds many visits; the headline Food /
+  Atmosphere / Price / Overall are **averaged across all visits**. Quick-add a
+  visit by long-pressing a card or tapping **Add visit** on the detail page.
+- **Per-visit rating form:**
+  - **3 haptic sliders** — Food (1–10, heavy tick), Atmosphere (1–10, heavy
+    tick), Price (1–500 quick-pick, light tick) + an **unlocked exact-amount**
+    box for any number.
+  - **"What did you get?"** — add items, each with an optional price and an
+    optional 1–10 rating.
+  - Photos + notes.
 - **Local, offline storage** (SQLite). No account required.
 
 ---

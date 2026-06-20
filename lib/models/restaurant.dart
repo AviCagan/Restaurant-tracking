@@ -1,36 +1,27 @@
 import 'dart:convert';
 
-/// A single rated restaurant.
+import 'visit.dart';
+
+/// A restaurant the user tracks. Holds identity (name/address/place/photo/
+/// categories) plus a list of [Visit]s. Headline ratings are averaged across
+/// visits.
 ///
-/// Designed to be sharing-ready: [ownerId], [visibility] and [groupIds]
-/// are unused in Phase 1 (local-only) but let Phase 2 (Firebase sync,
-/// friends/groups/public) layer on without a data migration.
+/// Sharing-ready: [ownerId], [visibility] and [groupIds] are unused in
+/// Phase 1 but let Phase 2 (Firebase sync) layer on without a migration.
 class Restaurant {
   final String id;
   final String name;
   final String address;
 
-  // Google Places linkage (optional — null if entered manually).
   final String? placeId;
   final double? lat;
   final double? lng;
 
-  /// Network URL of the auto-fetched Google photo.
   final String? photoUrl;
-
-  /// Local path of a user-supplied custom cover photo (overrides [photoUrl]).
   final String? customPhotoPath;
 
-  final int foodRating; // 1..10
-  final int atmosphereRating; // 1..10
-  final int price; // 1..500
-
   final List<String> categoryKeys;
-
-  /// Local file paths of extra photos attached to the rating.
-  final List<String> mediaPaths;
-
-  final String notes;
+  final List<Visit> visits;
 
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -49,12 +40,8 @@ class Restaurant {
     this.lng,
     this.photoUrl,
     this.customPhotoPath,
-    required this.foodRating,
-    required this.atmosphereRating,
-    required this.price,
     this.categoryKeys = const [],
-    this.mediaPaths = const [],
-    this.notes = '',
+    this.visits = const [],
     required this.createdAt,
     required this.updatedAt,
     this.ownerId,
@@ -62,10 +49,21 @@ class Restaurant {
     this.groupIds = const [],
   });
 
-  /// Overall score shown on the card (average of food + atmosphere, 0..10).
-  double get overallRating => (foodRating + atmosphereRating) / 2.0;
+  int get visitCount => visits.length;
 
-  /// The image to show: custom cover wins, else the Google photo.
+  double _avg(int Function(Visit) f) {
+    if (visits.isEmpty) return 0;
+    final total = visits.fold<int>(0, (s, v) => s + f(v));
+    return total / visits.length;
+  }
+
+  double get avgFood => _avg((v) => v.foodRating);
+  double get avgAtmosphere => _avg((v) => v.atmosphereRating);
+  double get avgPrice => _avg((v) => v.price);
+
+  /// Overall = average of (food+atmosphere) across visits, 0..10.
+  double get overallRating => (avgFood + avgAtmosphere) / 2.0;
+
   String? get coverImage =>
       (customPhotoPath != null && customPhotoPath!.isNotEmpty)
           ? customPhotoPath
@@ -82,12 +80,8 @@ class Restaurant {
     double? lng,
     String? photoUrl,
     String? customPhotoPath,
-    int? foodRating,
-    int? atmosphereRating,
-    int? price,
     List<String>? categoryKeys,
-    List<String>? mediaPaths,
-    String? notes,
+    List<Visit>? visits,
     DateTime? updatedAt,
     String? ownerId,
     String? visibility,
@@ -102,12 +96,8 @@ class Restaurant {
       lng: lng ?? this.lng,
       photoUrl: photoUrl ?? this.photoUrl,
       customPhotoPath: customPhotoPath ?? this.customPhotoPath,
-      foodRating: foodRating ?? this.foodRating,
-      atmosphereRating: atmosphereRating ?? this.atmosphereRating,
-      price: price ?? this.price,
       categoryKeys: categoryKeys ?? this.categoryKeys,
-      mediaPaths: mediaPaths ?? this.mediaPaths,
-      notes: notes ?? this.notes,
+      visits: visits ?? this.visits,
       createdAt: createdAt,
       updatedAt: updatedAt ?? DateTime.now(),
       ownerId: ownerId ?? this.ownerId,
@@ -125,12 +115,8 @@ class Restaurant {
         'lng': lng,
         'photoUrl': photoUrl,
         'customPhotoPath': customPhotoPath,
-        'foodRating': foodRating,
-        'atmosphereRating': atmosphereRating,
-        'price': price,
         'categoryKeys': jsonEncode(categoryKeys),
-        'mediaPaths': jsonEncode(mediaPaths),
-        'notes': notes,
+        'visits': jsonEncode(visits.map((v) => v.toJson()).toList()),
         'createdAt': createdAt.millisecondsSinceEpoch,
         'updatedAt': updatedAt.millisecondsSinceEpoch,
         'ownerId': ownerId,
@@ -139,10 +125,18 @@ class Restaurant {
       };
 
   factory Restaurant.fromMap(Map<String, dynamic> m) {
-    List<String> decodeList(dynamic v) {
-      if (v == null) return const [];
+    List<String> decodeStrings(dynamic v) {
       if (v is String && v.isNotEmpty) {
         return (jsonDecode(v) as List).map((e) => e.toString()).toList();
+      }
+      return const [];
+    }
+
+    List<Visit> decodeVisits(dynamic v) {
+      if (v is String && v.isNotEmpty) {
+        return (jsonDecode(v) as List)
+            .map((e) => Visit.fromJson(e as Map<String, dynamic>))
+            .toList();
       }
       return const [];
     }
@@ -156,19 +150,15 @@ class Restaurant {
       lng: (m['lng'] as num?)?.toDouble(),
       photoUrl: m['photoUrl'] as String?,
       customPhotoPath: m['customPhotoPath'] as String?,
-      foodRating: (m['foodRating'] as num?)?.toInt() ?? 5,
-      atmosphereRating: (m['atmosphereRating'] as num?)?.toInt() ?? 5,
-      price: (m['price'] as num?)?.toInt() ?? 0,
-      categoryKeys: decodeList(m['categoryKeys']),
-      mediaPaths: decodeList(m['mediaPaths']),
-      notes: m['notes'] as String? ?? '',
+      categoryKeys: decodeStrings(m['categoryKeys']),
+      visits: decodeVisits(m['visits']),
       createdAt:
           DateTime.fromMillisecondsSinceEpoch((m['createdAt'] as num).toInt()),
       updatedAt:
           DateTime.fromMillisecondsSinceEpoch((m['updatedAt'] as num).toInt()),
       ownerId: m['ownerId'] as String?,
       visibility: m['visibility'] as String? ?? 'private',
-      groupIds: decodeList(m['groupIds']),
+      groupIds: decodeStrings(m['groupIds']),
     );
   }
 }

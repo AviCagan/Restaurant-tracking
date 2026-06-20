@@ -5,22 +5,28 @@ import 'package:flutter/material.dart';
 import '../services/places_service.dart';
 import '../theme/app_theme.dart';
 
-/// Address field with Google Places autocomplete. When a suggestion is
-/// tapped it resolves full [PlaceDetails] (name, coords, photo) via
-/// [onPlaceSelected].
+/// A text field with Google Places autocomplete. When a suggestion is tapped
+/// it resolves full [PlaceDetails] (name, coords, photo) via [onPlaceSelected].
+///
+/// Used for the name-first flow: type the restaurant name, pick the matching
+/// place to confirm/lock in the address + photo.
 class PlaceAutocompleteField extends StatefulWidget {
   const PlaceAutocompleteField({
     super.key,
     required this.controller,
     required this.placesService,
     required this.onPlaceSelected,
-    this.hint = 'Search address…',
+    this.hint = 'Search…',
+    this.prefixIcon = Icons.search,
+    this.textCapitalization = TextCapitalization.words,
   });
 
   final TextEditingController controller;
   final PlacesService placesService;
   final void Function(PlaceDetails details) onPlaceSelected;
   final String hint;
+  final IconData prefixIcon;
+  final TextCapitalization textCapitalization;
 
   @override
   State<PlaceAutocompleteField> createState() => _PlaceAutocompleteFieldState();
@@ -30,7 +36,7 @@ class _PlaceAutocompleteFieldState extends State<PlaceAutocompleteField> {
   Timer? _debounce;
   List<PlacePrediction> _suggestions = [];
   bool _loading = false;
-  bool _suppress = false; // don't re-search right after a selection
+  bool _suppress = false;
 
   @override
   void initState() {
@@ -54,7 +60,7 @@ class _PlaceAutocompleteFieldState extends State<PlaceAutocompleteField> {
     _debounce?.cancel();
     final text = widget.controller.text;
     if (text.trim().length < 3) {
-      setState(() => _suggestions = []);
+      if (_suggestions.isNotEmpty) setState(() => _suggestions = []);
       return;
     }
     _debounce = Timer(const Duration(milliseconds: 300), () => _search(text));
@@ -87,16 +93,17 @@ class _PlaceAutocompleteFieldState extends State<PlaceAutocompleteField> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         TextField(
           controller: widget.controller,
+          textCapitalization: widget.textCapitalization,
           textInputAction: TextInputAction.search,
           decoration: InputDecoration(
             hintText: widget.hint,
-            prefixIcon: const Icon(Icons.location_on_outlined,
-                color: AppTheme.subtle),
+            prefixIcon: Icon(widget.prefixIcon, color: colors.subtle),
             suffixIcon: _loading
                 ? const Padding(
                     padding: EdgeInsets.all(12),
@@ -121,17 +128,17 @@ class _PlaceAutocompleteFieldState extends State<PlaceAutocompleteField> {
           Container(
             margin: const EdgeInsets.only(top: 6),
             decoration: BoxDecoration(
-              color: AppTheme.surface,
+              color: colors.surface,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppTheme.line),
+              border: Border.all(color: colors.line),
             ),
             clipBehavior: Clip.antiAlias,
             child: Column(
               children: _suggestions.take(5).map((p) {
                 return ListTile(
                   dense: true,
-                  leading: const Icon(Icons.place_outlined,
-                      color: AppTheme.subtle, size: 20),
+                  leading:
+                      Icon(Icons.place_outlined, color: colors.subtle, size: 20),
                   title: Text(p.mainText,
                       maxLines: 1, overflow: TextOverflow.ellipsis),
                   subtitle: p.secondaryText.isEmpty
