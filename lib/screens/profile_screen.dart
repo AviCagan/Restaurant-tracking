@@ -5,7 +5,9 @@ import '../data/restaurant_database.dart';
 import '../models/restaurant.dart';
 import '../models/user_profile.dart';
 import '../theme/app_theme.dart';
+import '../widgets/restaurant_card.dart';
 import '../widgets/sign_in_prompt.dart';
+import 'restaurant_detail_screen.dart';
 import 'settings_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -27,6 +29,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _load() async {
     final all = await RestaurantDatabase.instance.getAll();
     if (mounted) setState(() => _all = all);
+  }
+
+  List<Restaurant> get _favorites =>
+      _all.where((r) => r.isFavorite).toList();
+
+  Future<void> _openDetail(Restaurant r) async {
+    await Navigator.push(context,
+        MaterialPageRoute(builder: (_) => RestaurantDetailScreen(restaurant: r)));
+    _load();
   }
 
   int get _visitCount =>
@@ -160,7 +171,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ],
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 24),
+              const Row(
+                children: [
+                  Icon(Icons.favorite, size: 18, color: AppTheme.accent),
+                  SizedBox(width: 8),
+                  Text('Favorites',
+                      style:
+                          TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+                ],
+              ),
+              const SizedBox(height: 12),
+              if (_favorites.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    'Tap the heart on a restaurant to add it here.',
+                    style: TextStyle(color: colors.subtle),
+                  ),
+                )
+              else
+                ..._favorites.map((r) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: RestaurantCard(
+                        restaurant: r,
+                        onTap: () => _openDetail(r),
+                      ),
+                    )),
+              const SizedBox(height: 12),
               _Tile(
                 icon: Icons.edit_outlined,
                 label: 'Edit profile',

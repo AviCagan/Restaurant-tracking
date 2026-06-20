@@ -50,19 +50,19 @@ class AppColors extends ThemeExtension<AppColors> {
   }
 
   static const light = AppColors(
-    ink: Color(0xFF1A1A1F),
-    subtle: Color(0xFF8A8A93),
-    line: Color(0xFFECECEF),
+    ink: Color(0xFF3D3833), // warm dark
+    subtle: Color(0xFF9C9088), // warm gray
+    line: Color(0xFFECE3D8),
     surface: Color(0xFFFFFFFF),
-    background: Color(0xFFF6F6F8),
+    background: Color(0xFFFBF6F0), // warm cream
   );
 
   static const dark = AppColors(
-    ink: Color(0xFFF1F1F4),
-    subtle: Color(0xFF9A9AA4),
-    line: Color(0xFF2C2C34),
-    surface: Color(0xFF1B1B21),
-    background: Color(0xFF0E0E12),
+    ink: Color(0xFFF0E8DF),
+    subtle: Color(0xFFA89E93),
+    line: Color(0xFF302A22),
+    surface: Color(0xFF211C16),
+    background: Color(0xFF15110D), // warm near-black
   );
 }
 
@@ -72,15 +72,16 @@ extension AppColorsX on BuildContext {
 
 /// Sleek, modern, low-clutter theme (light + dark).
 class AppTheme {
-  static const Color accent = Color(0xFFFF5A5F); // coral
-  static const Color accentDark = Color(0xFFE0484D);
+  static const Color accent = Color(0xFFE2785A); // warm terracotta
+  static const Color accentDark = Color(0xFFC9603C);
 
   static ThemeData get light => _build(Brightness.light, AppColors.light);
   static ThemeData get dark => _build(Brightness.dark, AppColors.dark);
 
   static ThemeData _build(Brightness brightness, AppColors c) {
     final base = ThemeData(brightness: brightness, useMaterial3: true);
-    final textTheme = GoogleFonts.interTextTheme(base.textTheme).apply(
+    // Nunito: rounded, friendly, easy on the eyes.
+    final textTheme = GoogleFonts.nunitoTextTheme(base.textTheme).apply(
       bodyColor: c.ink,
       displayColor: c.ink,
     );
@@ -100,11 +101,11 @@ class AppTheme {
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         centerTitle: false,
-        titleTextStyle: GoogleFonts.inter(
+        titleTextStyle: GoogleFonts.nunito(
           color: c.ink,
           fontSize: 28,
           fontWeight: FontWeight.w800,
-          letterSpacing: -0.5,
+          letterSpacing: -0.2,
         ),
         iconTheme: IconThemeData(color: c.ink),
       ),

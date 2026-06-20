@@ -46,6 +46,7 @@ class VisitFormState extends State<VisitForm> {
   final _notesCtrl = TextEditingController();
 
   DateTime _date = DateTime.now();
+  String _visibility = 'friends';
   int _food = 5;
   int _atmosphere = 5;
   int _priceTier = 2;
@@ -58,6 +59,7 @@ class VisitFormState extends State<VisitForm> {
     final v = widget.initial;
     if (v != null) {
       _date = v.date;
+      _visibility = v.visibility;
       _food = v.foodRating;
       _atmosphere = v.atmosphereRating;
       _priceTier = PriceTier.clamp(v.price);
@@ -100,6 +102,7 @@ class VisitFormState extends State<VisitForm> {
       notes: _notesCtrl.text.trim(),
       items: items,
       photoPaths: List.of(_photoPaths),
+      visibility: _visibility,
     );
   }
 
@@ -173,6 +176,15 @@ class VisitFormState extends State<VisitForm> {
               ],
             ),
           ),
+        ),
+        const SizedBox(height: 20),
+
+        // ---- Who can see this ----
+        const _SectionLabel('Who can see this?'),
+        const SizedBox(height: 8),
+        _PrivacyToggle(
+          value: _visibility,
+          onChanged: (v) => setState(() => _visibility = v),
         ),
         const SizedBox(height: 24),
 
@@ -339,6 +351,68 @@ class _SectionLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Text(text,
       style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800));
+}
+
+class _PrivacyToggle extends StatelessWidget {
+  const _PrivacyToggle({required this.value, required this.onChanged});
+  final String value;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    Widget option(String key, IconData icon, String label, String sub) {
+      final on = value == key;
+      return Expanded(
+        child: GestureDetector(
+          onTap: () {
+            HapticFeedback.selectionClick();
+            onChanged(key);
+          },
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 120),
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+            decoration: BoxDecoration(
+              color: on ? AppTheme.accent : colors.surface,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: on ? AppTheme.accent : colors.line),
+            ),
+            child: Row(
+              children: [
+                Icon(icon,
+                    size: 20, color: on ? Colors.white : colors.subtle),
+                const SizedBox(width: 10),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(label,
+                        style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 14,
+                            color: on ? Colors.white : colors.ink)),
+                    Text(sub,
+                        style: TextStyle(
+                            fontSize: 10.5,
+                            color: on
+                                ? Colors.white.withValues(alpha: 0.9)
+                                : colors.subtle)),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Row(
+      children: [
+        option('friends', Icons.group_outlined, 'Friends', 'They can see it'),
+        const SizedBox(width: 10),
+        option('private', Icons.lock_outline, 'Private', 'Only you'),
+      ],
+    );
+  }
 }
 
 class _ItemRow extends StatelessWidget {

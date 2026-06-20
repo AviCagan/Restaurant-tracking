@@ -37,6 +37,17 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
     }
   }
 
+  Future<void> _toggleFavorite() async {
+    final updated = _r.copyWith(isFavorite: !_r.isFavorite);
+    await _db.upsert(updated);
+    if (mounted) {
+      setState(() {
+        _r = updated;
+        _changed = true;
+      });
+    }
+  }
+
   Future<void> _editIdentity() async {
     final updated = await Navigator.push<bool>(context,
         MaterialPageRoute(builder: (_) => AddRestaurantScreen(existing: _r)));
@@ -124,6 +135,13 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
                 pinned: true,
                 backgroundColor: colors.background,
                 actions: [
+                  IconButton(
+                    onPressed: _toggleFavorite,
+                    icon: Icon(
+                      _r.isFavorite ? Icons.favorite : Icons.favorite_border,
+                      color: _r.isFavorite ? AppTheme.accent : null,
+                    ),
+                  ),
                   IconButton(
                       onPressed: _editIdentity,
                       icon: const Icon(Icons.edit_outlined)),
@@ -449,6 +467,9 @@ class _VisitCard extends StatelessWidget {
               Text(date,
                   style: const TextStyle(
                       fontWeight: FontWeight.w800, fontSize: 14)),
+              const SizedBox(width: 8),
+              Icon(visit.isPrivate ? Icons.lock_outline : Icons.group_outlined,
+                  size: 13, color: colors.subtle),
               const Spacer(),
               _MiniStat(label: 'Food', value: '${visit.foodRating}'),
               _MiniStat(label: 'Atmos', value: '${visit.atmosphereRating}'),

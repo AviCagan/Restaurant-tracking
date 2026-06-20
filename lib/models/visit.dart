@@ -13,6 +13,9 @@ class Visit {
   final List<Item> items;
   final List<String> photoPaths;
 
+  /// 'private' (only you) or 'friends' (visible to friends).
+  final String visibility;
+
   const Visit({
     required this.id,
     required this.date,
@@ -22,7 +25,10 @@ class Visit {
     this.notes = '',
     this.items = const [],
     this.photoPaths = const [],
+    this.visibility = 'friends',
   });
+
+  bool get isPrivate => visibility == 'private';
 
   double get overall => (foodRating + atmosphereRating) / 2.0;
 
@@ -34,6 +40,7 @@ class Visit {
     String? notes,
     List<Item>? items,
     List<String>? photoPaths,
+    String? visibility,
   }) =>
       Visit(
         id: id,
@@ -44,6 +51,7 @@ class Visit {
         notes: notes ?? this.notes,
         items: items ?? this.items,
         photoPaths: photoPaths ?? this.photoPaths,
+        visibility: visibility ?? this.visibility,
       );
 
   Map<String, dynamic> toJson() => {
@@ -55,6 +63,7 @@ class Visit {
         'notes': notes,
         'items': items.map((e) => e.toJson()).toList(),
         'photoPaths': photoPaths,
+        'visibility': visibility,
       };
 
   factory Visit.fromJson(Map<String, dynamic> j) => Visit(
@@ -71,5 +80,6 @@ class Visit {
         photoPaths: (j['photoPaths'] as List? ?? [])
             .map((e) => e.toString())
             .toList(),
+        visibility: j['visibility'] as String? ?? 'friends',
       );
 }

@@ -83,6 +83,26 @@ class SocialService {
     ];
   }
 
+  /// A friend's favorite restaurants (mock).
+  static List<String> favoritesFor(String friendName) {
+    switch (friendName) {
+      case 'Maya Cohen':
+        return ['Dairy Palace', 'Taco Bell', 'Holy Schnitzel'];
+      case 'Daniel Roth':
+        return ['Holy Schnitzel', 'KAIFENG'];
+      case 'Sara Levi':
+        return ['KAIFENG', 'Sweetgreen', 'Dairy Palace'];
+      default:
+        return const [];
+    }
+  }
+
+  /// A friend's reviews shared with friends (mock) — newest first.
+  static List<FeedItem> reviewsFor(String friendName) {
+    return feed().where((f) => f.friendName == friendName).toList()
+      ..sort((a, b) => b.when.compareTo(a.when));
+  }
+
   static void addFriend(String username) {
     final clean = username.trim().replaceAll('@', '');
     if (clean.isEmpty) return;

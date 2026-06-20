@@ -23,6 +23,9 @@ class Restaurant {
   final List<String> categoryKeys;
   final List<Visit> visits;
 
+  /// Marked as a favorite (shown on your profile).
+  final bool isFavorite;
+
   // ---- Chain support ----
   /// Whether this is one location of a multi-location chain.
   final bool isChain;
@@ -53,6 +56,7 @@ class Restaurant {
     this.customPhotoPath,
     this.categoryKeys = const [],
     this.visits = const [],
+    this.isFavorite = false,
     this.isChain = false,
     this.chainName,
     this.locationLabel,
@@ -106,6 +110,7 @@ class Restaurant {
     String? customPhotoPath,
     List<String>? categoryKeys,
     List<Visit>? visits,
+    bool? isFavorite,
     bool? isChain,
     String? chainName,
     String? locationLabel,
@@ -125,6 +130,7 @@ class Restaurant {
       customPhotoPath: customPhotoPath ?? this.customPhotoPath,
       categoryKeys: categoryKeys ?? this.categoryKeys,
       visits: visits ?? this.visits,
+      isFavorite: isFavorite ?? this.isFavorite,
       isChain: isChain ?? this.isChain,
       chainName: chainName ?? this.chainName,
       locationLabel: locationLabel ?? this.locationLabel,
@@ -147,6 +153,7 @@ class Restaurant {
         'customPhotoPath': customPhotoPath,
         'categoryKeys': jsonEncode(categoryKeys),
         'visits': jsonEncode(visits.map((v) => v.toJson()).toList()),
+        'isFavorite': isFavorite ? 1 : 0,
         'isChain': isChain ? 1 : 0,
         'chainName': chainName,
         'locationLabel': locationLabel,
@@ -185,6 +192,7 @@ class Restaurant {
       customPhotoPath: m['customPhotoPath'] as String?,
       categoryKeys: decodeStrings(m['categoryKeys']),
       visits: decodeVisits(m['visits']),
+      isFavorite: (m['isFavorite'] as num?)?.toInt() == 1,
       isChain: (m['isChain'] as num?)?.toInt() == 1,
       chainName: m['chainName'] as String?,
       locationLabel: m['locationLabel'] as String?,

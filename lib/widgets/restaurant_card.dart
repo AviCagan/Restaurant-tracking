@@ -50,15 +50,26 @@ class RestaurantCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
-                        restaurant.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -0.3,
-                        ),
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              restaurant.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: -0.3,
+                              ),
+                            ),
+                          ),
+                          if (restaurant.isFavorite) ...[
+                            const SizedBox(width: 6),
+                            const Icon(Icons.favorite,
+                                size: 14, color: AppTheme.accent),
+                          ],
+                        ],
                       ),
                       const SizedBox(height: 3),
                       Text(

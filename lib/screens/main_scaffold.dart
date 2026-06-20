@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
-import 'feed_screen.dart';
-import 'friends_screen.dart';
 import 'home_screen.dart';
 import 'profile_screen.dart';
+import 'social_screen.dart';
 
 /// Root scaffold with the bottom navigation between the main sections.
 class MainScaffold extends StatefulWidget {
@@ -19,8 +18,7 @@ class _MainScaffoldState extends State<MainScaffold> {
 
   final _screens = const [
     HomeScreen(),
-    FeedScreen(),
-    FriendsScreen(),
+    SocialScreen(),
     ProfileScreen(),
   ];
 
@@ -39,11 +37,6 @@ class _MainScaffoldState extends State<MainScaffold> {
             icon: Icon(Icons.restaurant_outlined),
             selectedIcon: Icon(Icons.restaurant, color: AppTheme.accent),
             label: 'Restaurants',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.dynamic_feed_outlined),
-            selectedIcon: Icon(Icons.dynamic_feed, color: AppTheme.accent),
-            label: 'Feed',
           ),
           NavigationDestination(
             icon: Icon(Icons.group_outlined),
