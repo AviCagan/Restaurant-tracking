@@ -30,6 +30,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   SortOption _sort = SortOption.newest;
   final Set<String> _activeFilters = {};
+  final Set<String> _activeChains = {};
   String _query = '';
 
   double? _myLat;
@@ -88,13 +89,32 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  List<String> get _availableChains {
+    final names = <String>{};
+    for (final r in _all) {
+      if (r.isChain && (r.chainName?.trim().isNotEmpty ?? false)) {
+        names.add(r.chainName!.trim());
+      }
+    }
+    final list = names.toList()..sort();
+    return list;
+  }
+
   Future<void> _openFilter() async {
-    final result = await CategoryFilterSheet.show(context, _activeFilters);
+    final result = await FilterSheet.show(
+      context,
+      categories: _activeFilters,
+      chains: _activeChains,
+      availableChains: _availableChains,
+    );
     if (result == null) return;
     setState(() {
       _activeFilters
         ..clear()
-        ..addAll(result);
+        ..addAll(result.categories);
+      _activeChains
+        ..clear()
+        ..addAll(result.chains);
     });
   }
 
@@ -131,10 +151,14 @@ class _HomeScreenState extends State<HomeScreen> {
     var list = _all.where((r) {
       final matchesFilter = _activeFilters.isEmpty ||
           r.categoryKeys.any(_activeFilters.contains);
+      final matchesChain = _activeChains.isEmpty ||
+          (r.isChain &&
+              r.chainName != null &&
+              _activeChains.contains(r.chainName!.trim()));
       final matchesQuery = q.isEmpty ||
           r.name.toLowerCase().contains(q) ||
           r.address.toLowerCase().contains(q);
-      return matchesFilter && matchesQuery;
+      return matchesFilter && matchesChain && matchesQuery;
     }).toList();
 
     int byName(Restaurant a, Restaurant b) =>
@@ -199,7 +223,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             fontSize: 30, fontWeight: FontWeight.w800)),
                   ),
                   _FilterButton(
-                    count: _activeFilters.length,
+                    count: _activeFilters.length + _activeChains.length,
                     onTap: _openFilter,
                   ),
                   IconButton(
@@ -238,10 +262,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
             ),
-            if (_activeFilters.isNotEmpty)
+            if (_activeFilters.isNotEmpty || _activeChains.isNotEmpty)
               _ActiveFilters(
                 active: _activeFilters,
+                chains: _activeChains,
                 onRemove: (c) => setState(() => _activeFilters.remove(c)),
+                onRemoveChain: (c) => setState(() => _activeChains.remove(c)),
               ),
             const SizedBox(height: 4),
             Expanded(
@@ -319,10 +345,17 @@ class _FilterButton extends StatelessWidget {
 }
 
 class _ActiveFilters extends StatelessWidget {
-  const _ActiveFilters({required this.active, required this.onRemove});
+  const _ActiveFilters({
+    required this.active,
+    required this.chains,
+    required this.onRemove,
+    required this.onRemoveChain,
+  });
 
   final Set<String> active;
+  final Set<String> chains;
   final ValueChanged<String> onRemove;
+  final ValueChanged<String> onRemoveChain;
 
   @override
   Widget build(BuildContext context) {
@@ -332,36 +365,56 @@ class _ActiveFilters extends StatelessWidget {
       child: ListView(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
-        children: cats
-            .map((c) => Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: GestureDetector(
-                    onTap: () => onRemove(c.key),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 7),
-                      decoration: BoxDecoration(
-                        color: AppTheme.accent.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(30),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(c.icon, size: 14, color: AppTheme.accent),
-                          const SizedBox(width: 6),
-                          Text(c.label,
-                              style: const TextStyle(
-                                  fontSize: 12.5,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppTheme.accent)),
-                          const SizedBox(width: 4),
-                          const Icon(Icons.close,
-                              size: 13, color: AppTheme.accent),
-                        ],
-                      ),
-                    ),
-                  ),
-                ))
-            .toList(),
+        children: [
+          ...cats.map((c) => _RemovableChip(
+                icon: c.icon,
+                label: c.label,
+                onTap: () => onRemove(c.key),
+              )),
+          ...chains.map((chain) => _RemovableChip(
+                icon: Icons.storefront_outlined,
+                label: chain,
+                onTap: () => onRemoveChain(chain),
+              )),
+        ],
+      ),
+    );
+  }
+}
+
+class _RemovableChip extends StatelessWidget {
+  const _RemovableChip(
+      {required this.icon, required this.label, required this.onTap});
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+          decoration: BoxDecoration(
+            color: AppTheme.accent.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(30),
+          ),
+          child: Row(
+            children: [
+              Icon(icon, size: 14, color: AppTheme.accent),
+              const SizedBox(width: 6),
+              Text(label,
+                  style: const TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.accent)),
+              const SizedBox(width: 4),
+              const Icon(Icons.close, size: 13, color: AppTheme.accent),
+            ],
+          ),
+        ),
       ),
     );
   }

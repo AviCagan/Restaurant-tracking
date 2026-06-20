@@ -6,9 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:uuid/uuid.dart';
 
 import '../config.dart';
-import '../data/category_store.dart';
 import '../data/restaurant_database.dart';
-import '../models/category.dart';
 import '../models/restaurant.dart';
 import '../services/media_storage.dart';
 import '../services/places_service.dart';
@@ -17,8 +15,19 @@ import '../widgets/category_selector.dart';
 import '../widgets/place_autocomplete_field.dart';
 import '../widgets/visit_form.dart';
 
+/// Common chains used to recognize a chain even the first time you add one.
+const List<String> kKnownChains = [
+  "McDonald's", 'Starbucks', 'Chipotle', 'Subway', 'Burger King', "Wendy's",
+  'Taco Bell', 'KFC', 'Dunkin', "Domino's", 'Pizza Hut', 'Chick-fil-A',
+  'Five Guys', 'Shake Shack', 'Panera', 'Popeyes', 'Dairy Queen', 'Sonic',
+  'In-N-Out', 'Panda Express', 'Olive Garden', 'Cheesecake Factory',
+  "Applebee's", "Chili's", 'IHOP', "Denny's", 'Buffalo Wild Wings', 'Wingstop',
+  "Jersey Mike's", 'Sweetgreen', 'Cava', "Raising Cane's", 'Whataburger',
+  "Culver's", 'Krispy Kreme', "McAlister's", 'Qdoba', 'Noodles & Company',
+];
+
 /// Creates a new restaurant (with its first visit), or edits an existing
-/// restaurant's identity (name/address/categories/cover) when [existing] is set.
+/// restaurant's identity (name/categories/chain/cover) when [existing] is set.
 class AddRestaurantScreen extends StatefulWidget {
   const AddRestaurantScreen({super.key, this.existing});
 
@@ -50,6 +59,10 @@ class _AddRestaurantScreenState extends State<AddRestaurantScreen> {
   bool _saving = false;
   bool _downloadingCover = false;
 
+  // For smart chain detection.
+  List<Restaurant> _existing = [];
+  bool _userTouchedChain = false;
+
   bool get _isEditing => widget.existing != null;
 
   @override
@@ -68,7 +81,51 @@ class _AddRestaurantScreenState extends State<AddRestaurantScreen> {
       _isChain = e.isChain;
       _chainCtrl.text = e.chainName ?? '';
       _locationCtrl.text = e.locationLabel ?? '';
+      _userTouchedChain = true; // don't auto-detect over an existing choice
     }
+    _loadExisting();
+  }
+
+  Future<void> _loadExisting() async {
+    final all = await _db.getAll();
+    if (!mounted) return;
+    setState(() => _existing = widget.existing == null
+        ? all
+        : all.where((r) => r.id != widget.existing!.id).toList());
+  }
+
+  /// Detect a likely chain name from [name] using the user's own data first,
+  /// then a list of well-known chains. Returns the chain's display name or null.
+  String? _detectChain(String name) {
+    final n = name.trim().toLowerCase();
+    if (n.length < 3) return null;
+    for (final r in _existing) {
+      final base = (r.chainName ?? r.name).trim();
+      if (base.toLowerCase() == n) return base;
+    }
+    for (final c in kKnownChains) {
+      final cl = c.toLowerCase();
+      if (n == cl || n.contains(cl)) return c;
+    }
+    return null;
+  }
+
+  void _applyChainDetection(String name) {
+    if (_userTouchedChain || _isChain) return;
+    final detected = _detectChain(name);
+    if (detected == null) return;
+    setState(() {
+      _isChain = true;
+      _chainCtrl.text = detected;
+      if (_locationCtrl.text.trim().isEmpty && _addressCtrl.text.contains(',')) {
+        _locationCtrl.text = _addressCtrl.text.split(',').first.trim();
+      }
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+          content: Text('Recognized "$detected" as a chain — '
+              'confirm the location below.')),
+    );
   }
 
   @override
@@ -81,6 +138,7 @@ class _AddRestaurantScreenState extends State<AddRestaurantScreen> {
   }
 
   void _toggleChain(bool on) {
+    _userTouchedChain = true;
     setState(() {
       _isChain = on;
       if (on) {
@@ -106,6 +164,7 @@ class _AddRestaurantScreenState extends State<AddRestaurantScreen> {
       _downloadingCover = d.photoUrl != null;
     });
     if (d.photoUrl != null) _downloadCover(d.photoUrl!);
+    _applyChainDetection(d.name);
   }
 
   Future<void> _downloadCover(String url) async {
@@ -140,19 +199,12 @@ class _AddRestaurantScreenState extends State<AddRestaurantScreen> {
     final now = DateTime.now();
     final e = widget.existing;
 
-    // For chains, ensure a shared category exists for the chain name and tag it.
-    final cats = {..._categories};
     String? chainName;
     String? locationLabel;
     if (_isChain) {
       chainName = _chainCtrl.text.trim().isEmpty
           ? _nameCtrl.text.trim()
           : _chainCtrl.text.trim();
-      if (chainName.isNotEmpty) {
-        final cat =
-            await CategoryStore.ensure(chainName, iconIndex: chainIconIndex);
-        cats.add(cat.key);
-      }
       locationLabel = _locationCtrl.text.trim().isEmpty
           ? null
           : _locationCtrl.text.trim();
@@ -167,7 +219,7 @@ class _AddRestaurantScreenState extends State<AddRestaurantScreen> {
       lng: _lng,
       photoUrl: _photoUrl,
       customPhotoPath: _customPhotoPath,
-      categoryKeys: cats.toList(),
+      categoryKeys: _categories.toList(),
       visits: _isEditing
           ? e!.visits
           : [_visitKey.currentState!.collect()],
