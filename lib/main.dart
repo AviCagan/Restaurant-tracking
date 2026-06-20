@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 
+import 'data/auth_service.dart';
 import 'data/category_store.dart';
-import 'screens/home_screen.dart';
+import 'screens/main_scaffold.dart';
 import 'theme/app_theme.dart';
 import 'theme/theme_controller.dart';
 
@@ -9,6 +10,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await ThemeController.load();
   await CategoryStore.load();
+  await AuthService.load();
   runApp(const RestaurantTrackerApp());
 }
 
@@ -26,7 +28,7 @@ class RestaurantTrackerApp extends StatelessWidget {
           theme: AppTheme.light,
           darkTheme: AppTheme.dark,
           themeMode: mode,
-          home: const HomeScreen(),
+          home: const MainScaffold(),
         );
       },
     );

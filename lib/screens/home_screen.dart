@@ -315,7 +315,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 ),
                                 secondaryBackground: const _SwipeBackground(
                                   alignment: Alignment.centerRight,
-                                  color: AppTheme.accent,
+                                  color: Color(0xFF34C759),
                                   icon: Icons.add,
                                   label: 'Add visit',
                                 ),

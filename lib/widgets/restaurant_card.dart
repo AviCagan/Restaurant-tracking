@@ -68,18 +68,34 @@ class RestaurantCard extends StatelessWidget {
                         style: TextStyle(
                             fontSize: 12.5, color: colors.subtle, height: 1.25),
                       ),
+                      if (restaurant.isChain &&
+                          restaurant.locationDescriptor != null) ...[
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            const Icon(Icons.place,
+                                size: 12, color: AppTheme.accent),
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                restaurant.locationDescriptor!,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                    fontSize: 10.5,
+                                    height: 1.2,
+                                    color: AppTheme.accent,
+                                    fontWeight: FontWeight.w700),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                       const SizedBox(height: 5),
                       Wrap(
                         spacing: 6,
                         runSpacing: 6,
                         children: [
-                          if (restaurant.isChain &&
-                              restaurant.locationDescriptor != null)
-                            _Pill(
-                              icon: Icons.place_outlined,
-                              label: restaurant.locationDescriptor!,
-                              accent: true,
-                            ),
                           _Pill(
                             icon: Icons.event_repeat_outlined,
                             label: restaurant.visitCount == 1
@@ -119,21 +135,18 @@ class RestaurantCard extends StatelessWidget {
 }
 
 class _Pill extends StatelessWidget {
-  const _Pill({required this.icon, required this.label, this.accent = false});
+  const _Pill({required this.icon, required this.label});
   final IconData icon;
   final String label;
-  final bool accent;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final fg = accent ? AppTheme.accent : colors.subtle;
+    final fg = colors.subtle;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: accent
-            ? AppTheme.accent.withValues(alpha: 0.12)
-            : colors.background,
+        color: colors.background,
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
@@ -141,17 +154,9 @@ class _Pill extends StatelessWidget {
         children: [
           Icon(icon, size: 12, color: fg),
           const SizedBox(width: 4),
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 150),
-            child: Text(label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                    fontSize: 11,
-                    color: fg,
-                    fontWeight:
-                        accent ? FontWeight.w700 : FontWeight.w600)),
-          ),
+          Text(label,
+              style: TextStyle(
+                  fontSize: 11, color: fg, fontWeight: FontWeight.w600)),
         ],
       ),
     );
