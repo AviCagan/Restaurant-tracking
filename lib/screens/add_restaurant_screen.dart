@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:uuid/uuid.dart';
 
 import '../config.dart';
+import '../data/known_chains.dart';
 import '../data/restaurant_database.dart';
 import '../models/restaurant.dart';
 import '../services/media_storage.dart';
@@ -14,17 +15,6 @@ import '../theme/app_theme.dart';
 import '../widgets/category_selector.dart';
 import '../widgets/place_autocomplete_field.dart';
 import '../widgets/visit_form.dart';
-
-/// Common chains used to recognize a chain even the first time you add one.
-const List<String> kKnownChains = [
-  "McDonald's", 'Starbucks', 'Chipotle', 'Subway', 'Burger King', "Wendy's",
-  'Taco Bell', 'KFC', 'Dunkin', "Domino's", 'Pizza Hut', 'Chick-fil-A',
-  'Five Guys', 'Shake Shack', 'Panera', 'Popeyes', 'Dairy Queen', 'Sonic',
-  'In-N-Out', 'Panda Express', 'Olive Garden', 'Cheesecake Factory',
-  "Applebee's", "Chili's", 'IHOP', "Denny's", 'Buffalo Wild Wings', 'Wingstop',
-  "Jersey Mike's", 'Sweetgreen', 'Cava', "Raising Cane's", 'Whataburger',
-  "Culver's", 'Krispy Kreme', "McAlister's", 'Qdoba', 'Noodles & Company',
-];
 
 /// Creates a new restaurant (with its first visit), or edits an existing
 /// restaurant's identity (name/categories/chain/cover) when [existing] is set.
@@ -83,8 +73,11 @@ class _AddRestaurantScreenState extends State<AddRestaurantScreen> {
       _locationCtrl.text = e.locationLabel ?? '';
       _userTouchedChain = true; // don't auto-detect over an existing choice
     }
+    _nameCtrl.addListener(_onNameChanged);
     _loadExisting();
   }
+
+  void _onNameChanged() => _applyChainDetection(_nameCtrl.text);
 
   Future<void> _loadExisting() async {
     final all = await _db.getAll();
@@ -97,14 +90,15 @@ class _AddRestaurantScreenState extends State<AddRestaurantScreen> {
   /// Detect a likely chain name from [name] using the user's own data first,
   /// then a list of well-known chains. Returns the chain's display name or null.
   String? _detectChain(String name) {
-    final n = name.trim().toLowerCase();
+    final n = normalizeChain(name);
     if (n.length < 3) return null;
     for (final r in _existing) {
       final base = (r.chainName ?? r.name).trim();
-      if (base.toLowerCase() == n) return base;
+      if (normalizeChain(base) == n) return base;
     }
     for (final c in kKnownChains) {
-      final cl = c.toLowerCase();
+      final cl = normalizeChain(c);
+      if (cl.length < 3) continue;
       if (n == cl || n.contains(cl)) return c;
     }
     return null;
@@ -130,6 +124,7 @@ class _AddRestaurantScreenState extends State<AddRestaurantScreen> {
 
   @override
   void dispose() {
+    _nameCtrl.removeListener(_onNameChanged);
     _nameCtrl.dispose();
     _addressCtrl.dispose();
     _chainCtrl.dispose();

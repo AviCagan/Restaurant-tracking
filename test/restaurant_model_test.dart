@@ -3,8 +3,15 @@ import 'package:restaurant_tracker/models/restaurant.dart';
 import 'package:restaurant_tracker/models/visit.dart';
 import 'package:restaurant_tracker/models/item.dart';
 import 'package:restaurant_tracker/models/price_tier.dart';
+import 'package:restaurant_tracker/data/known_chains.dart';
 
 void main() {
+  test('normalizeChain ignores case and punctuation', () {
+    expect(normalizeChain("McDonald's"), 'mcdonalds');
+    expect(normalizeChain('mcdonalds'), 'mcdonalds');
+    expect(normalizeChain('Noodles & Company'), 'noodles company');
+    expect(normalizeChain('  Five   Guys  '), 'five guys');
+  });
   test('Restaurant with visits survives toMap/fromMap round-trip', () {
     final now = DateTime.fromMillisecondsSinceEpoch(1700000000000);
     final original = Restaurant(
