@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../data/app_prefs.dart';
 import '../data/auth_service.dart';
 import '../theme/app_theme.dart';
 import '../theme/theme_controller.dart';
@@ -37,6 +38,55 @@ class SettingsScreen extends StatelessWidget {
                 ),
               );
             },
+          ),
+          const SizedBox(height: 24),
+          const _SectionLabel('Privacy'),
+          Container(
+            decoration: BoxDecoration(
+              color: colors.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: colors.line),
+            ),
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text('New reviews default to',
+                        style: TextStyle(
+                            fontWeight: FontWeight.w700, color: colors.ink)),
+                  ),
+                ),
+                ValueListenableBuilder<String>(
+                  valueListenable: AppPrefs.defaultVisibility,
+                  builder: (context, vis, _) => Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+                    child: Row(
+                      children: [
+                        _visOption(context, 'friends', Icons.group_outlined,
+                            'Friends', vis),
+                        const SizedBox(width: 10),
+                        _visOption(context, 'private', Icons.lock_outline,
+                            'Private', vis),
+                      ],
+                    ),
+                  ),
+                ),
+                Divider(height: 1, color: colors.line),
+                ValueListenableBuilder<bool>(
+                  valueListenable: AppPrefs.categoriesViewable,
+                  builder: (context, on, _) => SwitchListTile(
+                    value: on,
+                    activeThumbColor: Colors.white,
+                    activeTrackColor: AppTheme.accent,
+                    title: const Text('Let friends see my categories',
+                        style: TextStyle(fontWeight: FontWeight.w600)),
+                    onChanged: AppPrefs.setCategoriesViewable,
+                  ),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 24),
           const _SectionLabel('Account'),
@@ -93,6 +143,37 @@ class SettingsScreen extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _visOption(BuildContext context, String key, IconData icon,
+      String label, String current) {
+    final colors = context.colors;
+    final on = key == current;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => AppPrefs.setVisibility(key),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 120),
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: on ? AppTheme.accent : colors.background,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: on ? AppTheme.accent : colors.line),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 18, color: on ? Colors.white : colors.subtle),
+              const SizedBox(width: 8),
+              Text(label,
+                  style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      color: on ? Colors.white : colors.ink)),
+            ],
+          ),
+        ),
       ),
     );
   }

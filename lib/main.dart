@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'data/app_prefs.dart';
 import 'data/auth_service.dart';
 import 'data/category_mapping.dart';
 import 'data/category_store.dart';
@@ -12,6 +13,7 @@ Future<void> main() async {
   await ThemeController.load();
   await CategoryStore.load();
   await CategoryMapping.load();
+  await AppPrefs.load();
   await AuthService.load();
   runApp(const RestaurantTrackerApp());
 }

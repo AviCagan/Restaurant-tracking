@@ -9,6 +9,7 @@ import '../config.dart';
 import '../data/known_chains.dart';
 import '../data/restaurant_database.dart';
 import '../models/restaurant.dart';
+import '../services/location_service.dart';
 import '../services/media_storage.dart';
 import '../services/places_service.dart';
 import '../theme/app_theme.dart';
@@ -82,6 +83,12 @@ class _AddRestaurantScreenState extends State<AddRestaurantScreen> {
     }
     _nameCtrl.addListener(_onNameChanged);
     _loadExisting();
+    _biasToCurrentLocation();
+  }
+
+  Future<void> _biasToCurrentLocation() async {
+    final pos = await LocationService.current();
+    if (pos != null) _places.setLocationBias(pos.latitude, pos.longitude);
   }
 
   void _onNameChanged() => _applyChainDetection(_nameCtrl.text);

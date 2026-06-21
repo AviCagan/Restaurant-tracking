@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 
+import '../data/app_prefs.dart';
 import '../models/item.dart';
 import '../models/price_tier.dart';
 import '../models/visit.dart';
@@ -46,7 +47,7 @@ class VisitFormState extends State<VisitForm> {
   final _notesCtrl = TextEditingController();
 
   DateTime _date = DateTime.now();
-  String _visibility = 'friends';
+  String _visibility = AppPrefs.defaultVisibility.value;
   int _food = 5;
   int _atmosphere = 5;
   int _priceTier = 2;

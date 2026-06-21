@@ -8,6 +8,7 @@ import '../theme/app_theme.dart';
 import '../widgets/gradient_app_bar.dart';
 import '../widgets/restaurant_card.dart';
 import '../widgets/sign_in_prompt.dart';
+import 'all_restaurants_screen.dart';
 import 'restaurant_detail_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -142,7 +143,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 child: Row(
                   children: [
                     _Stat(label: 'Places visited', value: '${_all.length}'),
-                    _Stat(label: 'Favorites', value: '${_favorites.length}'),
                   ],
                 ),
               ),
@@ -174,6 +174,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     )),
               const SizedBox(height: 12),
+              _Tile(
+                icon: Icons.restaurant_menu,
+                label: 'All my restaurants (${_all.length})',
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => AllRestaurantsScreen(
+                        title: 'My Restaurants', restaurants: _all),
+                  ),
+                ),
+              ),
               _Tile(
                 icon: Icons.edit_outlined,
                 label: 'Edit profile',

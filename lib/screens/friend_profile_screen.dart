@@ -4,6 +4,7 @@ import '../data/social_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/feed_card.dart';
 import '../widgets/gradient_app_bar.dart';
+import 'compare_categories_screen.dart';
 
 class FriendProfileScreen extends StatelessWidget {
   const FriendProfileScreen({super.key, required this.friend});
@@ -32,6 +33,24 @@ class FriendProfileScreen extends StatelessWidget {
                 Text('@${friend.username}',
                     style: TextStyle(color: colors.subtle)),
               ],
+            ),
+          ),
+          const SizedBox(height: 20),
+          Container(
+            decoration: AppTheme.panel(context, radius: 16),
+            child: ListTile(
+              leading: const Icon(Icons.category_outlined,
+                  color: AppTheme.accent),
+              title: const Text('Categories',
+                  style: TextStyle(fontWeight: FontWeight.w700)),
+              subtitle: Text('Compare & import ${friend.name.split(' ').first}\'s categories',
+                  style: TextStyle(color: colors.subtle, fontSize: 12)),
+              trailing: Icon(Icons.chevron_right, color: colors.subtle),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => CompareCategoriesScreen(friend: friend)),
+              ),
             ),
           ),
           const SizedBox(height: 24),

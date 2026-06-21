@@ -193,6 +193,16 @@ class SocialService {
         AppCategory(key: 'f_cafe', label: 'Coffee & Cafe', iconIndex: 15),
       ];
 
+  /// A specific friend's categories (mock — a deterministic subset, so each
+  /// friend looks a little different).
+  static List<AppCategory> categoriesFor(String friendName) {
+    final all = [...friendCategories()];
+    all.sort((a, b) => '${a.key}$friendName'
+        .hashCode
+        .compareTo('${b.key}$friendName'.hashCode));
+    return all.take(4).toList();
+  }
+
   /// Friend-rated places for the food map (mock, around Staten Island NY).
   static List<MapPlace> mapPlaces() {
     const data = [

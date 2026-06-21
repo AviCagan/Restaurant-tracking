@@ -56,6 +56,16 @@ class PlacesService {
 
   String _sessionToken = const Uuid().v4();
 
+  double? _biasLat;
+  double? _biasLng;
+
+  /// Bias autocomplete results toward this location (the user's position), so
+  /// the nearest matching restaurant ranks first.
+  void setLocationBias(double? lat, double? lng) {
+    _biasLat = lat;
+    _biasLng = lng;
+  }
+
   /// Start a fresh autocomplete session (call when opening the field).
   void newSession() => _sessionToken = const Uuid().v4();
 
@@ -65,16 +75,28 @@ class PlacesService {
     if (!enabled || input.trim().isEmpty) return [];
 
     final uri = Uri.parse('$_base/places:autocomplete');
+    final reqBody = <String, dynamic>{
+      'input': input,
+      'sessionToken': _sessionToken,
+    };
+    if (_biasLat != null && _biasLng != null) {
+      // Bias (not restrict) toward the user's location, ~30km radius, and set
+      // the origin so closer results are favored.
+      reqBody['locationBias'] = {
+        'circle': {
+          'center': {'latitude': _biasLat, 'longitude': _biasLng},
+          'radius': 30000.0,
+        }
+      };
+      reqBody['origin'] = {'latitude': _biasLat, 'longitude': _biasLng};
+    }
     final res = await http.post(
       uri,
       headers: {
         'Content-Type': 'application/json',
         'X-Goog-Api-Key': _apiKey,
       },
-      body: jsonEncode({
-        'input': input,
-        'sessionToken': _sessionToken,
-      }),
+      body: jsonEncode(reqBody),
     );
 
     if (res.statusCode != 200) {
