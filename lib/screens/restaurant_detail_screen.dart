@@ -6,10 +6,12 @@ import 'package:intl/intl.dart';
 
 import '../data/category_store.dart';
 import '../data/restaurant_database.dart';
+import '../data/social_service.dart';
 import '../models/price_tier.dart';
 import '../models/restaurant.dart';
 import '../models/visit.dart';
 import '../theme/app_theme.dart';
+import '../widgets/feed_card.dart';
 import 'add_restaurant_screen.dart';
 import 'add_visit_screen.dart';
 
@@ -111,6 +113,7 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
     final cover = _r.coverImage;
     final cats = CategoryStore.fromKeys(_r.categoryKeys);
     final visits = [..._r.visits]..sort((a, b) => b.date.compareTo(a.date));
+    final friendVisits = SocialService.friendsAtRestaurant(_r.name);
 
     return PopScope(
       canPop: false,
@@ -228,12 +231,13 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
                               .toList(),
                         ),
                       ],
+                      if (friendVisits.isNotEmpty) ...[
+                        const SizedBox(height: 26),
+                        _FriendsWhoWent(visits: friendVisits),
+                      ],
                       const SizedBox(height: 26),
-                      Text('Visits',
-                          style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w800,
-                              color: colors.ink)),
+                      Text('Your visits',
+                          style: AppTheme.heading(19, color: colors.ink)),
                       const SizedBox(height: 12),
                       if (visits.isEmpty)
                         Text('No visits yet — tap "Add visit".',
@@ -542,6 +546,125 @@ class _VisitCard extends StatelessWidget {
                   .toList(),
             ),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+class _FriendsWhoWent extends StatelessWidget {
+  const _FriendsWhoWent({required this.visits});
+  final List<FriendVisit> visits;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final liked = visits.where((v) => v.liked).toList();
+    final disliked = visits.where((v) => !v.liked).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Text('👥', style: TextStyle(fontSize: 18)),
+            const SizedBox(width: 8),
+            Text('Friends who went', style: AppTheme.heading(19, color: colors.ink)),
+          ],
+        ),
+        const SizedBox(height: 12),
+        if (liked.isNotEmpty) ...[
+          const _GroupLabel(
+              emoji: '👍', label: 'Liked it', color: Color(0xFF3FB55D)),
+          const SizedBox(height: 8),
+          ...liked.map((v) => _FriendVisitRow(visit: v)),
+        ],
+        if (disliked.isNotEmpty) ...[
+          if (liked.isNotEmpty) const SizedBox(height: 12),
+          const _GroupLabel(
+              emoji: '👎', label: 'Not for them', color: Color(0xFFE0795A)),
+          const SizedBox(height: 8),
+          ...disliked.map((v) => _FriendVisitRow(visit: v)),
+        ],
+      ],
+    );
+  }
+}
+
+class _GroupLabel extends StatelessWidget {
+  const _GroupLabel(
+      {required this.emoji, required this.label, required this.color});
+  final String emoji;
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Text(emoji, style: const TextStyle(fontSize: 14)),
+        const SizedBox(width: 6),
+        Text(label,
+            style: TextStyle(
+                fontSize: 13, fontWeight: FontWeight.w800, color: color)),
+      ],
+    );
+  }
+}
+
+class _FriendVisitRow extends StatelessWidget {
+  const _FriendVisitRow({required this.visit});
+  final FriendVisit visit;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final t = (visit.rating / 10).clamp(0.0, 1.0);
+    final color =
+        Color.lerp(const Color(0xFFF5A623), const Color(0xFF3FB55D), t)!;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: colors.line),
+      ),
+      child: Row(
+        children: [
+          PersonAvatar(name: visit.friend.name, size: 38),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(visit.friend.name,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w800, fontSize: 14)),
+                const SizedBox(height: 1),
+                Text('“${visit.review}”',
+                    style: TextStyle(
+                        fontSize: 12.5,
+                        color: colors.subtle,
+                        fontStyle: FontStyle.italic)),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              visit.rating == visit.rating.roundToDouble()
+                  ? visit.rating.toStringAsFixed(0)
+                  : visit.rating.toStringAsFixed(1),
+              style: TextStyle(
+                  color: color, fontWeight: FontWeight.w900, fontSize: 15),
+            ),
+          ),
         ],
       ),
     );

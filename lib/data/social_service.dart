@@ -32,6 +32,16 @@ class FeedItem {
   });
 }
 
+/// A friend's visit to a specific restaurant (their rating + short review).
+class FriendVisit {
+  final Friend friend;
+  final double rating;
+  final String review;
+  const FriendVisit(this.friend, this.rating, this.review);
+
+  bool get liked => rating >= 7;
+}
+
 /// Mock social backend for the Phase 2 preview. Phase 2 proper replaces this
 /// with Firestore (friends, follows, groups, public feed).
 class SocialService {
@@ -101,6 +111,36 @@ class SocialService {
   static List<FeedItem> reviewsFor(String friendName) {
     return feed().where((f) => f.friendName == friendName).toList()
       ..sort((a, b) => b.when.compareTo(a.when));
+  }
+
+  static const _reviewSnippets = [
+    'Would 100% go back!',
+    'Pretty solid all around.',
+    'Not really my vibe.',
+    'Absolutely loved it.',
+    'Service was a little slow.',
+    'Great value for what you get.',
+    'Honestly a bit overrated.',
+    'So good, came back twice.',
+    'Cozy spot, great for groups.',
+    'Expected more, sadly.',
+  ];
+
+  /// Friends who have been to [restaurantName] (mock, deterministic from the
+  /// friends list so it stays stable per restaurant).
+  static List<FriendVisit> friendsAtRestaurant(String restaurantName) {
+    final out = <FriendVisit>[];
+    for (final f in friends.value) {
+      final h = '${f.username}|$restaurantName'.hashCode.abs();
+      if (h % 2 != 0) continue; // only some friends went
+      final rating = (h % 10) + 1;
+      out.add(FriendVisit(
+        f,
+        rating.toDouble(),
+        _reviewSnippets[h % _reviewSnippets.length],
+      ));
+    }
+    return out;
   }
 
   static void addFriend(String username) {

@@ -228,16 +228,26 @@ class _RatingBadge extends StatelessWidget {
         : value.toStringAsFixed(1);
 
     return Container(
-      width: 50,
-      height: 50,
+      width: 52,
+      height: 52,
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(15),
+        gradient: LinearGradient(
+          colors: [color.withValues(alpha: 0.92), color],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.35),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Center(
         child: Text(text,
-            style: TextStyle(
-                color: color, fontWeight: FontWeight.w900, fontSize: 19)),
+            style: AppTheme.heading(21, color: Colors.white)),
       ),
     );
   }

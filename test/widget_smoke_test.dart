@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:restaurant_tracker/models/restaurant.dart';
 import 'package:restaurant_tracker/models/visit.dart';
 import 'package:restaurant_tracker/theme/app_theme.dart';
-import 'package:restaurant_tracker/widgets/haptic_slider.dart';
+import 'package:restaurant_tracker/widgets/tap_rating_bar.dart';
 import 'package:restaurant_tracker/widgets/restaurant_card.dart';
 import 'package:restaurant_tracker/widgets/category_selector.dart';
 
@@ -32,39 +32,27 @@ Visit _visit(int food, int atmos, int priceTier) => Visit(
     );
 
 void main() {
-  testWidgets('HapticSlider renders label, subtitle and value', (tester) async {
-    await tester.pumpWidget(_wrap(HapticSlider(
+  testWidgets('TapRatingBar shows label, value and descriptor', (tester) async {
+    await tester.pumpWidget(_wrap(TapRatingBar(
       label: 'Food',
-      subtitle: 'How good was the food?',
       value: 5,
-      min: 1,
-      max: 10,
-      step: 1,
-      haptic: SliderHaptic.heavy,
       onChanged: (_) {},
     )));
 
     expect(find.text('Food'), findsOneWidget);
-    expect(find.text('How good was the food?'), findsOneWidget);
     expect(find.text('5'), findsOneWidget);
-    expect(find.byType(Slider), findsOneWidget);
+    expect(find.text('Decent'), findsOneWidget); // word for 5
   });
 
-  testWidgets('Price slider shows custom value above its quick-pick max',
-      (tester) async {
-    await tester.pumpWidget(_wrap(HapticSlider(
-      label: 'Price',
-      value: 1200, // above the 1..500 range
-      min: 1,
-      max: 500,
-      step: 10,
-      haptic: SliderHaptic.light,
-      valueLabelBuilder: (v) => '\$$v',
+  testWidgets('TapRatingBar shows Perfect at 10', (tester) async {
+    await tester.pumpWidget(_wrap(TapRatingBar(
+      label: 'Atmosphere',
+      value: 10,
       onChanged: (_) {},
     )));
 
-    expect(find.text('\$1200'), findsOneWidget); // chip shows true value
-    expect(find.byType(Slider), findsOneWidget); // slider still renders (pinned)
+    expect(find.text('10'), findsOneWidget);
+    expect(find.text('Perfect'), findsOneWidget);
   });
 
   testWidgets('RestaurantCard shows name, address, visits and avg score',

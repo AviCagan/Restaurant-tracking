@@ -237,10 +237,9 @@ class _HomeScreenState extends State<HomeScreen> {
               padding: const EdgeInsets.fromLTRB(20, 12, 8, 4),
               child: Row(
                 children: [
-                  const Expanded(
+                  Expanded(
                     child: Text('Restaurants',
-                        style: TextStyle(
-                            fontSize: 30, fontWeight: FontWeight.w800)),
+                        style: AppTheme.heading(32, color: colors.ink)),
                   ),
                   _FilterButton(
                     count: _activeFilters.length + _activeChains.length,
@@ -556,12 +555,11 @@ class _EmptyState extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.ramen_dining_outlined, size: 64, color: colors.subtle),
+            Text(filtered ? '🔍' : '🍽️', style: const TextStyle(fontSize: 56)),
             const SizedBox(height: 16),
             Text(
-              filtered ? 'No matches' : 'No ratings yet',
-              style:
-                  const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+              filtered ? 'No matches' : 'Let\'s eat!',
+              style: AppTheme.heading(22, color: context.colors.ink),
             ),
             const SizedBox(height: 6),
             Text(

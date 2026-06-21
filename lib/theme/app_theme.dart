@@ -74,6 +74,20 @@ extension AppColorsX on BuildContext {
 class AppTheme {
   static const Color accent = Color(0xFFE2785A); // warm terracotta
   static const Color accentDark = Color(0xFFC9603C);
+  static const Color honey = Color(0xFFF2B705); // warm highlight
+  static const Color sage = Color(0xFF7FA98A); // friendly green
+
+  /// Friendly rounded display font for headings & big numbers.
+  static TextStyle heading(double size,
+          {Color? color, FontWeight weight = FontWeight.w600}) =>
+      GoogleFonts.fredoka(
+          fontSize: size, fontWeight: weight, color: color, letterSpacing: 0.2);
+
+  static const Gradient accentGradient = LinearGradient(
+    colors: [Color(0xFFEC8A5E), accentDark],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
 
   static ThemeData get light => _build(Brightness.light, AppColors.light);
   static ThemeData get dark => _build(Brightness.dark, AppColors.dark);
@@ -101,11 +115,11 @@ class AppTheme {
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         centerTitle: false,
-        titleTextStyle: GoogleFonts.nunito(
+        titleTextStyle: GoogleFonts.fredoka(
           color: c.ink,
-          fontSize: 28,
-          fontWeight: FontWeight.w800,
-          letterSpacing: -0.2,
+          fontSize: 27,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.2,
         ),
         iconTheme: IconThemeData(color: c.ink),
       ),
@@ -150,14 +164,16 @@ class AppTheme {
     );
   }
 
-  /// Soft shadow used on cards (subtle in both themes).
+  /// Soft, warm shadow used on cards (subtle in both themes).
   static List<BoxShadow> shadow(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
     return [
       BoxShadow(
-        color: Colors.black.withValues(alpha: dark ? 0.25 : 0.06),
-        blurRadius: 18,
-        offset: const Offset(0, 8),
+        color: dark
+            ? Colors.black.withValues(alpha: 0.30)
+            : const Color(0xFFB8855E).withValues(alpha: 0.13),
+        blurRadius: 22,
+        offset: const Offset(0, 10),
       ),
     ];
   }

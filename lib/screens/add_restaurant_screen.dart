@@ -58,6 +58,7 @@ class _AddRestaurantScreenState extends State<AddRestaurantScreen> {
   // For smart chain detection.
   List<Restaurant> _existing = [];
   bool _userTouchedChain = false;
+  String? _detectedChain;
 
   bool get _isEditing => widget.existing != null;
 
@@ -117,16 +118,12 @@ class _AddRestaurantScreenState extends State<AddRestaurantScreen> {
     setState(() {
       _isChain = true;
       _chainCtrl.text = detected;
+      _detectedChain = detected;
       if (!_userTouchedLocation) {
         final loc = _suggestedChainLocation(detected);
         if (loc != null) _locationCtrl.text = loc;
       }
     });
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-          content: Text('Recognized "$detected" as a chain — '
-              'confirm the location below.')),
-    );
   }
 
   /// Builds a location label like "Richmond Ave, Staten Island". If another
@@ -179,6 +176,7 @@ class _AddRestaurantScreenState extends State<AddRestaurantScreen> {
     _userTouchedChain = true;
     setState(() {
       _isChain = on;
+      if (!on) _detectedChain = null;
       if (on) {
         if (_chainCtrl.text.trim().isEmpty) {
           _chainCtrl.text = _nameCtrl.text.trim();
@@ -393,32 +391,70 @@ class _AddRestaurantScreenState extends State<AddRestaurantScreen> {
           // ---- Chain ----
           Container(
             decoration: BoxDecoration(
-              color: colors.surface,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: colors.line),
+              color: _isChain
+                  ? AppTheme.accent.withValues(alpha: 0.06)
+                  : colors.surface,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                  color: _isChain ? AppTheme.accent.withValues(alpha: 0.4)
+                                  : colors.line),
             ),
             child: Column(
               children: [
                 SwitchListTile(
                   value: _isChain,
                   onChanged: _toggleChain,
-                  activeThumbColor: AppTheme.accent,
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 16),
-                  title: const Text('Part of a chain',
-                      style: TextStyle(fontWeight: FontWeight.w700)),
+                  activeThumbColor: Colors.white,
+                  activeTrackColor: AppTheme.accent,
+                  contentPadding: const EdgeInsets.fromLTRB(14, 6, 14, 6),
+                  title: const Text('Part of a chain?',
+                      style: TextStyle(
+                          fontWeight: FontWeight.w800, fontSize: 15)),
                   subtitle: Text(
-                    'Groups all locations under one category',
+                    'Group every location together',
                     style: TextStyle(fontSize: 12, color: colors.subtle),
                   ),
-                  secondary:
-                      Icon(Icons.storefront_outlined, color: colors.subtle),
+                  secondary: Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: AppTheme.accent.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.storefront_outlined,
+                        color: AppTheme.accent),
+                  ),
                 ),
                 if (_isChain)
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                    padding: const EdgeInsets.fromLTRB(14, 0, 14, 16),
                     child: Column(
                       children: [
+                        if (_detectedChain != null)
+                          Container(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: AppTheme.honey.withValues(alpha: 0.16),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              children: [
+                                const Text('✨',
+                                    style: TextStyle(fontSize: 16)),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'Looks like $_detectedChain — grouped for you!',
+                                    style: const TextStyle(
+                                        fontSize: 12.5,
+                                        fontWeight: FontWeight.w700),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         TextField(
                           controller: _chainCtrl,
                           textCapitalization: TextCapitalization.words,
@@ -433,7 +469,7 @@ class _AddRestaurantScreenState extends State<AddRestaurantScreen> {
                           textCapitalization: TextCapitalization.words,
                           onChanged: (_) => _userTouchedLocation = true,
                           decoration: const InputDecoration(
-                            labelText: 'This location',
+                            labelText: 'Which location?',
                             hintText: 'e.g. Richmond Ave, Staten Island',
                           ),
                         ),

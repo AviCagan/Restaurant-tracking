@@ -11,11 +11,11 @@ import '../models/price_tier.dart';
 import '../models/visit.dart';
 import '../services/media_storage.dart';
 import '../theme/app_theme.dart';
-import 'haptic_slider.dart';
 import 'rating_picker_sheet.dart';
+import 'tap_rating_bar.dart';
 
-/// Editable form for a single visit (date, sliders, price tier, items,
-/// photos, notes).
+/// Fast, satisfying form for a single visit. Core ratings (food, atmosphere,
+/// price) are front and center; everything else lives under "Add details".
 ///
 /// Parents drive it with a `GlobalKey<VisitFormState>` and call
 /// [VisitFormState.collect] to read the resulting [Visit] on save.
@@ -52,6 +52,9 @@ class VisitFormState extends State<VisitForm> {
   int _priceTier = 2;
   final List<_ItemDraft> _items = [];
   final List<String> _photoPaths = [];
+  bool _showDetails = false;
+
+  static const _maxPhotos = 10;
 
   @override
   void initState() {
@@ -69,6 +72,10 @@ class VisitFormState extends State<VisitForm> {
         _items.add(
             _ItemDraft(name: it.name, price: it.price, rating: it.rating));
       }
+      // Open details if there's anything beyond the core rating.
+      _showDetails = v.items.isNotEmpty ||
+          v.photoPaths.isNotEmpty ||
+          v.notes.isNotEmpty;
     }
   }
 
@@ -81,7 +88,6 @@ class VisitFormState extends State<VisitForm> {
     super.dispose();
   }
 
-  /// Read the current editor state as a [Visit].
   Visit collect() {
     final items = <Item>[];
     for (final d in _items) {
@@ -119,8 +125,6 @@ class VisitFormState extends State<VisitForm> {
     }
   }
 
-  static const _maxPhotos = 10;
-
   Future<void> _addPhotos() async {
     final remaining = _maxPhotos - _photoPaths.length;
     if (remaining <= 0) {
@@ -138,11 +142,6 @@ class VisitFormState extends State<VisitForm> {
     }
     if (!mounted) return;
     setState(() => _photoPaths.addAll(persisted));
-    if (imgs.length > remaining) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Only the first $_maxPhotos were added.')),
-      );
-    }
   }
 
   @override
@@ -151,7 +150,61 @@ class VisitFormState extends State<VisitForm> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // ---- Date ----
+        TapRatingBar(
+          label: 'Food',
+          emoji: '🍔',
+          value: _food,
+          onChanged: (v) => setState(() => _food = v),
+        ),
+        const SizedBox(height: 24),
+        TapRatingBar(
+          label: 'Atmosphere',
+          emoji: '✨',
+          value: _atmosphere,
+          onChanged: (v) => setState(() => _atmosphere = v),
+        ),
+        Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Text('Service, vibe, seating…',
+              style: TextStyle(fontSize: 11.5, color: colors.subtle)),
+        ),
+        const SizedBox(height: 22),
+        Row(
+          children: [
+            const Text('💸', style: TextStyle(fontSize: 20)),
+            const SizedBox(width: 8),
+            Text('Price', style: AppTheme.heading(18, color: colors.ink)),
+          ],
+        ),
+        const SizedBox(height: 12),
+        _PriceTierSelector(
+          selected: _priceTier,
+          onChanged: (t) => setState(() => _priceTier = t),
+        ),
+        const SizedBox(height: 22),
+
+        // ---- Optional details ----
+        _DetailsToggle(
+          open: _showDetails,
+          onTap: () => setState(() => _showDetails = !_showDetails),
+        ),
+        AnimatedSize(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOut,
+          alignment: Alignment.topCenter,
+          child: _showDetails
+              ? _detailsSection(colors)
+              : const SizedBox(width: double.infinity),
+        ),
+      ],
+    );
+  }
+
+  Widget _detailsSection(AppColors colors) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 16),
         const _SectionLabel('Date'),
         const SizedBox(height: 8),
         GestureDetector(
@@ -178,49 +231,13 @@ class VisitFormState extends State<VisitForm> {
           ),
         ),
         const SizedBox(height: 20),
-
-        // ---- Who can see this ----
         const _SectionLabel('Who can see this?'),
         const SizedBox(height: 8),
         _PrivacyToggle(
           value: _visibility,
           onChanged: (v) => setState(() => _visibility = v),
         ),
-        const SizedBox(height: 24),
-
-        HapticSlider(
-          label: 'Food',
-          subtitle: 'How good was the food? (1–10)',
-          value: _food,
-          min: 1,
-          max: 10,
-          step: 1,
-          haptic: SliderHaptic.heavy,
-          onChanged: (v) => setState(() => _food = v),
-        ),
-        const SizedBox(height: 18),
-        HapticSlider(
-          label: 'Atmosphere',
-          subtitle: 'Customer service, restaurant style, seating, etc. (1–10)',
-          value: _atmosphere,
-          min: 1,
-          max: 10,
-          step: 1,
-          haptic: SliderHaptic.heavy,
-          onChanged: (v) => setState(() => _atmosphere = v),
-        ),
-        const SizedBox(height: 24),
-
-        // ---- Price tier ----
-        const _SectionLabel('Price'),
-        const SizedBox(height: 10),
-        _PriceTierSelector(
-          selected: _priceTier,
-          onChanged: (t) => setState(() => _priceTier = t),
-        ),
-        const SizedBox(height: 28),
-
-        // ---- What did you get ----
+        const SizedBox(height: 22),
         Row(
           children: [
             const _SectionLabel('What did you get?'),
@@ -245,9 +262,7 @@ class VisitFormState extends State<VisitForm> {
                 _items.removeAt(e.key);
               }),
             )),
-        const SizedBox(height: 28),
-
-        // ---- Photos ----
+        const SizedBox(height: 22),
         Row(
           children: [
             const _SectionLabel('Photos'),
@@ -263,9 +278,7 @@ class VisitFormState extends State<VisitForm> {
           onAdd: _addPhotos,
           onRemove: (p) => setState(() => _photoPaths.remove(p)),
         ),
-        const SizedBox(height: 28),
-
-        // ---- Notes ----
+        const SizedBox(height: 22),
         const _SectionLabel('Notes'),
         const SizedBox(height: 10),
         TextField(
@@ -277,6 +290,41 @@ class VisitFormState extends State<VisitForm> {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _DetailsToggle extends StatelessWidget {
+  const _DetailsToggle({required this.open, required this.onTap});
+  final bool open;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+        decoration: BoxDecoration(
+          color: colors.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: colors.line),
+        ),
+        child: Row(
+          children: [
+            Icon(open ? Icons.remove_circle_outline : Icons.add_circle_outline,
+                size: 20, color: AppTheme.accent),
+            const SizedBox(width: 10),
+            Text(open ? 'Hide details' : 'Add details (items, photos, notes)',
+                style: const TextStyle(fontWeight: FontWeight.w700)),
+            const Spacer(),
+            Icon(open ? Icons.expand_less : Icons.expand_more,
+                color: colors.subtle),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -307,7 +355,7 @@ class _PriceTierSelector extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 decoration: BoxDecoration(
                   color: on ? AppTheme.accent : colors.surface,
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(16),
                   border:
                       Border.all(color: on ? AppTheme.accent : colors.line),
                 ),
@@ -379,8 +427,7 @@ class _PrivacyToggle extends StatelessWidget {
             ),
             child: Row(
               children: [
-                Icon(icon,
-                    size: 20, color: on ? Colors.white : colors.subtle),
+                Icon(icon, size: 20, color: on ? Colors.white : colors.subtle),
                 const SizedBox(width: 10),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
