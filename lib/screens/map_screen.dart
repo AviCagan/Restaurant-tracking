@@ -8,12 +8,46 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../data/category_mapping.dart';
 import '../data/filter_state.dart';
+import '../data/restaurant_database.dart';
 import '../data/social_service.dart';
+import '../models/restaurant.dart';
 import '../services/location_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/category_filter_sheet.dart';
 import '../widgets/feed_card.dart';
 import 'compare_categories_screen.dart';
+
+/// One person's rating of a place.
+class _Rater {
+  final String name;
+  final double rating;
+  final String review;
+  final bool isYou;
+  const _Rater(this.name, this.rating, this.review, this.isYou);
+  bool get liked => rating >= 7;
+}
+
+/// A place on the map, with everyone (you + friends) who rated it.
+class _Pin {
+  final String name;
+  final String address;
+  final double lat;
+  final double lng;
+  final List<String> categoryKeys;
+  final List<_Rater> raters;
+  _Pin(this.name, this.address, this.lat, this.lng, this.categoryKeys,
+      this.raters);
+}
+
+Color ratingColor(double r) {
+  final t = (r / 10).clamp(0.0, 1.0);
+  const red = Color(0xFFE53935);
+  const amber = Color(0xFFF9A825);
+  const green = Color(0xFF2E9E5B);
+  return t < 0.5
+      ? Color.lerp(red, amber, t / 0.5)!
+      : Color.lerp(amber, green, (t - 0.5) / 0.5)!;
+}
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -24,26 +58,73 @@ class MapScreen extends StatefulWidget {
 
 class _MapScreenState extends State<MapScreen> {
   GoogleMapController? _controller;
-  // Default to Staten Island (matches the mock data).
   static const _defaultCenter = LatLng(40.5900, -74.1200);
 
   Set<Marker> _markers = {};
   final Map<int, BitmapDescriptor> _pinCache = {};
 
+  List<Restaurant> _myPlaces = [];
+  // Selected people to filter by (empty = everyone).
+  final Set<String> _people = {};
+
   @override
   void initState() {
     super.initState();
-    _buildMarkers();
+    _loadMine();
   }
 
-  List<MapPlace> get _places {
-    final active = FilterState.categories;
-    final all = SocialService.mapPlaces();
-    if (active.isEmpty) return all;
-    return all.where((p) {
-      final resolved = CategoryMapping.resolveAll(p.categoryKeys).toSet();
-      return resolved.any(active.contains);
-    }).toList();
+  Future<void> _loadMine() async {
+    final all = await RestaurantDatabase.instance.getAll();
+    _myPlaces = all.where((r) => r.lat != null && r.lng != null).toList();
+    await _buildMarkers();
+  }
+
+  List<String> get _peopleList =>
+      ['You', ...SocialService.friends.value.map((f) => f.name)];
+
+  /// All map pins, merging friends' rated places with your own (by name).
+  List<_Pin> _allPins() {
+    final byName = <String, _Pin>{};
+
+    _Pin acc(String name, String address, double lat, double lng) =>
+        byName.putIfAbsent(
+            name.toLowerCase(), () => _Pin(name, address, lat, lng, [], []));
+
+    for (final mp in SocialService.mapPlaces()) {
+      final p = acc(mp.name, mp.address, mp.lat, mp.lng);
+      p.categoryKeys.addAll(mp.categoryKeys);
+      for (final v in mp.visits) {
+        p.raters.add(_Rater(v.friend.name, v.rating, v.review, false));
+      }
+    }
+    for (final r in _myPlaces) {
+      final p = acc(r.name, r.address, r.lat!, r.lng!);
+      p.categoryKeys.addAll(r.categoryKeys);
+      p.raters.add(_Rater('You', r.overallRating, '', true));
+    }
+    return byName.values.toList();
+  }
+
+  /// Visible pins after applying category + people filters; returns the pin,
+  /// its visible raters and the resulting average rating.
+  List<(_Pin, List<_Rater>, double)> _visible() {
+    final cats = FilterState.categories;
+    final out = <(_Pin, List<_Rater>, double)>[];
+    for (final pin in _allPins()) {
+      var raters = pin.raters;
+      if (_people.isNotEmpty) {
+        raters = raters.where((r) => _people.contains(r.name)).toList();
+      }
+      if (raters.isEmpty) continue;
+      if (cats.isNotEmpty) {
+        final resolved = CategoryMapping.resolveAll(pin.categoryKeys).toSet();
+        if (!resolved.any(cats.contains)) continue;
+      }
+      final rating =
+          raters.fold<double>(0, (s, r) => s + r.rating) / raters.length;
+      out.add((pin, raters, rating));
+    }
+    return out;
   }
 
   Future<BitmapDescriptor> _pin(double rating) async {
@@ -51,70 +132,75 @@ class _MapScreenState extends State<MapScreen> {
     final cached = _pinCache[key];
     if (cached != null) return cached;
 
-    const scale = 3.0;
-    const w = 88.0 * scale;
-    const h = 108.0 * scale;
-    const cx = 44.0 * scale;
-    const r = 38.0 * scale;
-    final t = (rating / 10).clamp(0.0, 1.0);
-    final color =
-        Color.lerp(const Color(0xFFEF5350), const Color(0xFF2EA85C), t)!;
+    const s = 3.0;
+    const cx = 39.0 * s, cy = 33.0 * s, r = 30.0 * s;
+    const w = 78.0 * s, h = 96.0 * s;
+    final color = ratingColor(rating);
 
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
 
-    final fill = Paint()..color = color;
-    final white = Paint()
-      ..color = Colors.white
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 6 * scale;
-    final shadow = Paint()
-      ..color = Colors.black.withValues(alpha: 0.25)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
+    void shape(Paint paint, double dy) {
+      canvas.save();
+      canvas.translate(0, dy);
+      final tail = Path()
+        ..moveTo(cx - 13 * s, cy + 21 * s)
+        ..lineTo(cx, h - 2 * s)
+        ..lineTo(cx + 13 * s, cy + 21 * s)
+        ..close();
+      canvas.drawPath(tail, paint);
+      canvas.drawCircle(const Offset(cx, cy), r, paint);
+      canvas.restore();
+    }
 
-    // Tail
-    final tail = Path()
-      ..moveTo(cx - 18 * scale, 64 * scale)
-      ..lineTo(cx, h)
-      ..lineTo(cx + 18 * scale, 64 * scale)
-      ..close();
-    canvas.drawPath(tail, shadow);
-    canvas.drawPath(tail, fill);
-    // Circle
-    canvas.drawCircle(const Offset(cx, r + 6), r, shadow);
-    canvas.drawCircle(const Offset(cx, r + 6), r, fill);
-    canvas.drawCircle(const Offset(cx, r + 6), r, white);
+    // Soft shadow.
+    shape(
+        Paint()
+          ..color = Colors.black.withValues(alpha: 0.22)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 7),
+        3 * s);
+    // Fill + white ring.
+    shape(Paint()..color = color..isAntiAlias = true, 0);
+    canvas.drawCircle(
+        const Offset(cx, cy),
+        r,
+        Paint()
+          ..color = Colors.white
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 5 * s
+          ..isAntiAlias = true);
 
-    // Score text
     final tp = TextPainter(
       textDirection: TextDirection.ltr,
       text: TextSpan(
         text: rating == 0 ? '–' : rating.toStringAsFixed(1),
         style: const TextStyle(
             color: Colors.white,
-            fontSize: 28 * scale,
-            fontWeight: FontWeight.w900),
+            fontSize: 23 * s,
+            fontWeight: FontWeight.w800),
       ),
     )..layout();
-    tp.paint(canvas, Offset(cx - tp.width / 2, (r + 6) - tp.height / 2));
+    tp.paint(canvas, const Offset(cx, cy) - Offset(tp.width / 2, tp.height / 2));
 
-    final img =
-        await recorder.endRecording().toImage(w.toInt(), h.toInt());
+    final img = await recorder.endRecording().toImage(w.toInt(), h.toInt());
     final bytes = await img.toByteData(format: ui.ImageByteFormat.png);
     final desc = BitmapDescriptor.bytes(bytes!.buffer.asUint8List(),
-        imagePixelRatio: scale);
+        imagePixelRatio: s);
     _pinCache[key] = desc;
     return desc;
   }
 
   Future<void> _buildMarkers() async {
     final markers = <Marker>{};
-    for (final p in _places) {
+    for (final entry in _visible()) {
+      final pin = entry.$1;
+      final raters = entry.$2;
+      final rating = entry.$3;
       markers.add(Marker(
-        markerId: MarkerId(p.id),
-        position: LatLng(p.lat, p.lng),
-        icon: await _pin(p.rating),
-        onTap: () => _showPlace(p),
+        markerId: MarkerId(pin.name),
+        position: LatLng(pin.lat, pin.lng),
+        icon: await _pin(rating),
+        onTap: () => _showPlace(pin, raters, rating),
       ));
     }
     if (mounted) setState(() => _markers = markers);
@@ -142,13 +228,76 @@ class _MapScreenState extends State<MapScreen> {
     FilterState.categories
       ..clear()
       ..addAll(result.categories);
-    FilterState.chains
-      ..clear()
-      ..addAll(result.chains);
     _buildMarkers();
   }
 
-  Future<void> _openInMaps(MapPlace p) async {
+  void _openPeople() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: context.colors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => StatefulBuilder(
+        builder: (context, setSheet) {
+          void toggle(VoidCallback fn) {
+            setSheet(fn);
+            setState(() {});
+            _buildMarkers();
+          }
+
+          final colors = context.colors;
+          return SafeArea(
+            child: ListView(
+              shrinkWrap: true,
+              padding: const EdgeInsets.fromLTRB(8, 16, 8, 16),
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Row(
+                    children: [
+                      Text('Whose ratings?',
+                          style: AppTheme.heading(18, color: colors.ink)),
+                      const Spacer(),
+                      if (_people.isNotEmpty)
+                        TextButton(
+                          onPressed: () => toggle(_people.clear),
+                          child: const Text('Everyone'),
+                        ),
+                    ],
+                  ),
+                ),
+                ..._peopleList.map((name) {
+                  final on = _people.isEmpty || _people.contains(name);
+                  return CheckboxListTile(
+                    value: on,
+                    activeColor: AppTheme.accent,
+                    secondary: PersonAvatar(name: name, size: 38),
+                    title: Text(name,
+                        style: const TextStyle(fontWeight: FontWeight.w700)),
+                    onChanged: (_) => toggle(() {
+                      // Move from "everyone" to an explicit set on first tap.
+                      if (_people.isEmpty) {
+                        _people.addAll(_peopleList);
+                      }
+                      _people.contains(name)
+                          ? _people.remove(name)
+                          : _people.add(name);
+                      if (_people.length == _peopleList.length) {
+                        _people.clear(); // back to "everyone"
+                      }
+                    }),
+                  );
+                }),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _openInMaps(_Pin p) async {
     final uri = Uri.parse(
         'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent('${p.name} ${p.address}')}');
     try {
@@ -161,13 +310,11 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
-  void _showPlace(MapPlace p) {
+  void _showPlace(_Pin p, List<_Rater> raters, double rating) {
     final colors = context.colors;
-    final liked = p.visits.where((v) => v.liked).toList();
-    final disliked = p.visits.where((v) => !v.liked).toList();
-    final t = (p.rating / 10).clamp(0.0, 1.0);
-    final color =
-        Color.lerp(const Color(0xFFEF5350), const Color(0xFF2EA85C), t)!;
+    final liked = raters.where((v) => v.liked).toList();
+    final disliked = raters.where((v) => !v.liked).toList();
+    final color = ratingColor(rating);
 
     showModalBottomSheet(
       context: context,
@@ -187,12 +334,11 @@ class _MapScreenState extends State<MapScreen> {
           children: [
             Center(
               child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                    color: colors.line,
-                    borderRadius: BorderRadius.circular(2)),
-              ),
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                      color: colors.line,
+                      borderRadius: BorderRadius.circular(2))),
             ),
             const SizedBox(height: 16),
             Row(
@@ -213,13 +359,11 @@ class _MapScreenState extends State<MapScreen> {
                   width: 52,
                   height: 52,
                   decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.16),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
+                      color: color.withValues(alpha: 0.16),
+                      borderRadius: BorderRadius.circular(16)),
                   child: Center(
-                    child: Text(p.rating.toStringAsFixed(1),
-                        style: AppTheme.heading(20, color: color)),
-                  ),
+                      child: Text(rating.toStringAsFixed(1),
+                          style: AppTheme.heading(20, color: color))),
                 ),
               ],
             ),
@@ -246,17 +390,17 @@ class _MapScreenState extends State<MapScreen> {
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 11, color: colors.subtle)),
             const SizedBox(height: 20),
-            Text('Friends who went',
+            Text('Who rated it',
                 style: AppTheme.heading(18, color: colors.ink)),
             const SizedBox(height: 10),
             if (liked.isNotEmpty) ...[
-              _group('👍 Liked it', const Color(0xFF2EA85C)),
-              ...liked.map(_friendRow),
+              _group('👍 Liked it', const Color(0xFF2E9E5B)),
+              ...liked.map(_raterRow),
             ],
             if (disliked.isNotEmpty) ...[
               const SizedBox(height: 8),
               _group('👎 Not for them', const Color(0xFFE0795A)),
-              ...disliked.map(_friendRow),
+              ...disliked.map(_raterRow),
             ],
           ],
         ),
@@ -271,31 +415,30 @@ class _MapScreenState extends State<MapScreen> {
                 fontSize: 13, fontWeight: FontWeight.w800, color: color)),
       );
 
-  Widget _friendRow(FriendVisit v) {
+  Widget _raterRow(_Rater v) {
     final colors = context.colors;
-    final t = (v.rating / 10).clamp(0.0, 1.0);
-    final color =
-        Color.lerp(const Color(0xFFEF5350), const Color(0xFF2EA85C), t)!;
+    final color = ratingColor(v.rating);
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: AppTheme.panel(context, radius: 16),
       child: Row(
         children: [
-          PersonAvatar(name: v.friend.name, size: 38),
+          PersonAvatar(name: v.name, size: 38),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(v.friend.name,
+                Text(v.isYou ? 'You' : v.name,
                     style: const TextStyle(
                         fontWeight: FontWeight.w800, fontSize: 14)),
-                Text('“${v.review}”',
-                    style: TextStyle(
-                        fontSize: 12.5,
-                        color: colors.subtle,
-                        fontStyle: FontStyle.italic)),
+                if (v.review.isNotEmpty)
+                  Text('“${v.review}”',
+                      style: TextStyle(
+                          fontSize: 12.5,
+                          color: colors.subtle,
+                          fontStyle: FontStyle.italic)),
               ],
             ),
           ),
@@ -304,7 +447,7 @@ class _MapScreenState extends State<MapScreen> {
             decoration: BoxDecoration(
                 color: color.withValues(alpha: 0.16),
                 borderRadius: BorderRadius.circular(10)),
-            child: Text(v.rating.toStringAsFixed(0),
+            child: Text(v.rating.toStringAsFixed(1),
                 style: TextStyle(
                     color: color, fontWeight: FontWeight.w900, fontSize: 15)),
           ),
@@ -317,6 +460,7 @@ class _MapScreenState extends State<MapScreen> {
   Widget build(BuildContext context) {
     final colors = context.colors;
     final filterCount = FilterState.categories.length;
+    final peopleActive = _people.isNotEmpty;
     return Stack(
       children: [
         GoogleMap(
@@ -331,7 +475,6 @@ class _MapScreenState extends State<MapScreen> {
           myLocationButtonEnabled: false,
           zoomControlsEnabled: false,
           mapToolbarEnabled: false,
-          // Let the map win all touch gestures (so the page doesn't swipe).
           gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
             Factory<OneSequenceGestureRecognizer>(
                 () => EagerGestureRecognizer()),
@@ -341,24 +484,35 @@ class _MapScreenState extends State<MapScreen> {
           top: 12,
           left: 16,
           right: 16,
-          child: Row(
-            children: [
-              _MapButton(
-                icon: Icons.tune_rounded,
-                label: filterCount > 0 ? 'Filters ($filterCount)' : 'Filter',
-                onTap: _openFilter,
-              ),
-              const SizedBox(width: 8),
-              _MapButton(
-                icon: Icons.compare_arrows_rounded,
-                label: 'Compare',
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (_) => const CompareCategoriesScreen()),
-                ).then((_) => _buildMarkers()),
-              ),
-            ],
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _MapButton(
+                  icon: Icons.tune_rounded,
+                  label: filterCount > 0 ? 'Filters ($filterCount)' : 'Filter',
+                  active: filterCount > 0,
+                  onTap: _openFilter,
+                ),
+                const SizedBox(width: 8),
+                _MapButton(
+                  icon: Icons.people_alt_rounded,
+                  label: peopleActive ? 'People (${_people.length})' : 'People',
+                  active: peopleActive,
+                  onTap: _openPeople,
+                ),
+                const SizedBox(width: 8),
+                _MapButton(
+                  icon: Icons.compare_arrows_rounded,
+                  label: 'Compare',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const CompareCategoriesScreen()),
+                  ).then((_) => _buildMarkers()),
+                ),
+              ],
+            ),
           ),
         ),
         Positioned(
@@ -378,11 +532,16 @@ class _MapScreenState extends State<MapScreen> {
 }
 
 class _MapButton extends StatelessWidget {
-  const _MapButton(
-      {required this.icon, required this.label, required this.onTap});
+  const _MapButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.active = false,
+  });
   final IconData icon;
   final String label;
   final VoidCallback onTap;
+  final bool active;
 
   @override
   Widget build(BuildContext context) {
@@ -392,20 +551,25 @@ class _MapButton extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: colors.surface,
+          color: active ? AppTheme.accent : colors.surface,
           borderRadius: BorderRadius.circular(16),
-          border:
-              Border.all(color: colors.ink.withValues(alpha: 0.13), width: 1.5),
+          border: Border.all(
+              color: active
+                  ? AppTheme.accent
+                  : colors.ink.withValues(alpha: 0.13),
+              width: 1.5),
           boxShadow: AppTheme.shadow(context),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 18, color: AppTheme.accent),
+            Icon(icon, size: 18, color: active ? Colors.white : AppTheme.accent),
             const SizedBox(width: 6),
             Text(label,
-                style: const TextStyle(
-                    fontWeight: FontWeight.w800, fontSize: 13)),
+                style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13,
+                    color: active ? Colors.white : colors.ink)),
           ],
         ),
       ),

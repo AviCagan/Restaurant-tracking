@@ -25,11 +25,6 @@ class _MainScaffoldState extends State<MainScaffold> {
   final _pageController = PageController();
 
   static const _titles = ['My Eats', 'Food Map', 'Friends'];
-  static const _subtitles = [
-    'Your rated spots',
-    'Where your friends have eaten',
-    'What your circle is eating',
-  ];
   static const _items = [
     (Icons.restaurant_rounded, 'Eats'),
     (Icons.map_rounded, 'Map'),
@@ -81,20 +76,9 @@ class _MainScaffoldState extends State<MainScaffold> {
                     switchInCurve: Curves.easeOut,
                     transitionBuilder: (child, anim) =>
                         FadeTransition(opacity: anim, child: child),
-                    child: Column(
-                      key: ValueKey(_index),
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(_titles[_index],
-                            style: AppTheme.heading(26, color: Colors.white)),
-                        Text(_subtitles[_index],
-                            style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.9),
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600)),
-                      ],
-                    ),
+                    child: Text(_titles[_index],
+                        key: ValueKey(_index),
+                        style: AppTheme.heading(28, color: Colors.white)),
                   ),
                 ),
                 _CircleButton(
@@ -218,31 +202,15 @@ class _PillNav extends StatelessWidget {
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 220),
                         curve: Curves.easeOut,
-                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
                         margin: const EdgeInsets.symmetric(horizontal: 4),
                         decoration: BoxDecoration(
                           gradient: selected ? AppTheme.accentGradient : null,
                           borderRadius: BorderRadius.circular(20),
                         ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(items[i].$1,
-                                size: 22,
-                                color:
-                                    selected ? Colors.white : colors.subtle),
-                            const SizedBox(width: 8),
-                            AnimatedSize(
-                              duration: const Duration(milliseconds: 220),
-                              curve: Curves.easeOut,
-                              child: selected
-                                  ? Text(items[i].$2,
-                                      style: AppTheme.heading(15,
-                                          color: Colors.white))
-                                  : const SizedBox.shrink(),
-                            ),
-                          ],
-                        ),
+                        child: Icon(items[i].$1,
+                            size: 24,
+                            color: selected ? Colors.white : colors.subtle),
                       ),
                     ),
                   );
