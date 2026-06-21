@@ -28,7 +28,6 @@ dependencies:
 
   # Food map + in-app place view
   google_maps_flutter: ^2.9.0
-  webview_flutter: ^4.10.0
   url_launcher: ^6.3.1
 
   # UI / formatting

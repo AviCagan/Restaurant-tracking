@@ -1,5 +1,10 @@
+import 'dart:ui' as ui;
+
+import 'package:flutter/foundation.dart' show Factory;
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../data/category_mapping.dart';
 import '../data/filter_state.dart';
@@ -9,7 +14,6 @@ import '../theme/app_theme.dart';
 import '../widgets/category_filter_sheet.dart';
 import '../widgets/feed_card.dart';
 import 'compare_categories_screen.dart';
-import 'place_web_screen.dart';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -23,6 +27,15 @@ class _MapScreenState extends State<MapScreen> {
   // Default to Staten Island (matches the mock data).
   static const _defaultCenter = LatLng(40.5900, -74.1200);
 
+  Set<Marker> _markers = {};
+  final Map<int, BitmapDescriptor> _pinCache = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _buildMarkers();
+  }
+
   List<MapPlace> get _places {
     final active = FilterState.categories;
     final all = SocialService.mapPlaces();
@@ -33,18 +46,78 @@ class _MapScreenState extends State<MapScreen> {
     }).toList();
   }
 
-  Set<Marker> _markers() {
-    return _places.map((p) {
-      final hue = (((p.rating - 1) / 9) * 120).clamp(0.0, 120.0);
-      return Marker(
+  Future<BitmapDescriptor> _pin(double rating) async {
+    final key = rating.round().clamp(0, 10);
+    final cached = _pinCache[key];
+    if (cached != null) return cached;
+
+    const scale = 3.0;
+    const w = 88.0 * scale;
+    const h = 108.0 * scale;
+    const cx = 44.0 * scale;
+    const r = 38.0 * scale;
+    final t = (rating / 10).clamp(0.0, 1.0);
+    final color =
+        Color.lerp(const Color(0xFFEF5350), const Color(0xFF2EA85C), t)!;
+
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+
+    final fill = Paint()..color = color;
+    final white = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 6 * scale;
+    final shadow = Paint()
+      ..color = Colors.black.withValues(alpha: 0.25)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
+
+    // Tail
+    final tail = Path()
+      ..moveTo(cx - 18 * scale, 64 * scale)
+      ..lineTo(cx, h)
+      ..lineTo(cx + 18 * scale, 64 * scale)
+      ..close();
+    canvas.drawPath(tail, shadow);
+    canvas.drawPath(tail, fill);
+    // Circle
+    canvas.drawCircle(const Offset(cx, r + 6), r, shadow);
+    canvas.drawCircle(const Offset(cx, r + 6), r, fill);
+    canvas.drawCircle(const Offset(cx, r + 6), r, white);
+
+    // Score text
+    final tp = TextPainter(
+      textDirection: TextDirection.ltr,
+      text: TextSpan(
+        text: rating == 0 ? '–' : rating.toStringAsFixed(1),
+        style: const TextStyle(
+            color: Colors.white,
+            fontSize: 28 * scale,
+            fontWeight: FontWeight.w900),
+      ),
+    )..layout();
+    tp.paint(canvas, Offset(cx - tp.width / 2, (r + 6) - tp.height / 2));
+
+    final img =
+        await recorder.endRecording().toImage(w.toInt(), h.toInt());
+    final bytes = await img.toByteData(format: ui.ImageByteFormat.png);
+    final desc = BitmapDescriptor.bytes(bytes!.buffer.asUint8List(),
+        imagePixelRatio: scale);
+    _pinCache[key] = desc;
+    return desc;
+  }
+
+  Future<void> _buildMarkers() async {
+    final markers = <Marker>{};
+    for (final p in _places) {
+      markers.add(Marker(
         markerId: MarkerId(p.id),
         position: LatLng(p.lat, p.lng),
-        icon: BitmapDescriptor.defaultMarkerWithHue(hue),
-        infoWindow: InfoWindow(
-            title: p.name, snippet: '${p.rating.toStringAsFixed(1)} ★'),
+        icon: await _pin(p.rating),
         onTap: () => _showPlace(p),
-      );
-    }).toSet();
+      ));
+    }
+    if (mounted) setState(() => _markers = markers);
   }
 
   Future<void> _recenter() async {
@@ -52,6 +125,10 @@ class _MapScreenState extends State<MapScreen> {
     final target =
         pos == null ? _defaultCenter : LatLng(pos.latitude, pos.longitude);
     await _controller?.animateCamera(CameraUpdate.newLatLngZoom(target, 13));
+    if (pos == null && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Turn on location to see where you are.')));
+    }
   }
 
   Future<void> _openFilter() async {
@@ -62,14 +139,26 @@ class _MapScreenState extends State<MapScreen> {
       availableChains: const [],
     );
     if (result == null) return;
-    setState(() {
-      FilterState.categories
-        ..clear()
-        ..addAll(result.categories);
-      FilterState.chains
-        ..clear()
-        ..addAll(result.chains);
-    });
+    FilterState.categories
+      ..clear()
+      ..addAll(result.categories);
+    FilterState.chains
+      ..clear()
+      ..addAll(result.chains);
+    _buildMarkers();
+  }
+
+  Future<void> _openInMaps(MapPlace p) async {
+    final uri = Uri.parse(
+        'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent('${p.name} ${p.address}')}');
+    try {
+      final ok = await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
+      if (!ok) await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {
+      try {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } catch (_) {}
+    }
   }
 
   void _showPlace(MapPlace p) {
@@ -78,7 +167,7 @@ class _MapScreenState extends State<MapScreen> {
     final disliked = p.visits.where((v) => !v.liked).toList();
     final t = (p.rating / 10).clamp(0.0, 1.0);
     final color =
-        Color.lerp(const Color(0xFFF5A623), const Color(0xFF3FB55D), t)!;
+        Color.lerp(const Color(0xFFEF5350), const Color(0xFF2EA85C), t)!;
 
     showModalBottomSheet(
       context: context,
@@ -112,7 +201,8 @@ class _MapScreenState extends State<MapScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(p.name, style: AppTheme.heading(22, color: colors.ink)),
+                      Text(p.name,
+                          style: AppTheme.heading(22, color: colors.ink)),
                       const SizedBox(height: 2),
                       Text(p.address,
                           style: TextStyle(color: colors.subtle, fontSize: 13)),
@@ -123,7 +213,7 @@ class _MapScreenState extends State<MapScreen> {
                   width: 52,
                   height: 52,
                   decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.15),
+                    color: color.withValues(alpha: 0.16),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Center(
@@ -142,13 +232,10 @@ class _MapScreenState extends State<MapScreen> {
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16)),
                 ),
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => PlaceWebScreen(
-                        query: '${p.name} ${p.address}', title: p.name),
-                  ),
-                ),
+                onPressed: () {
+                  Navigator.pop(context);
+                  _openInMaps(p);
+                },
                 icon: const Icon(Icons.map_outlined),
                 label: const Text('Open in Google Maps',
                     style: TextStyle(fontWeight: FontWeight.w800)),
@@ -159,10 +246,11 @@ class _MapScreenState extends State<MapScreen> {
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 11, color: colors.subtle)),
             const SizedBox(height: 20),
-            Text('Friends who went', style: AppTheme.heading(18, color: colors.ink)),
+            Text('Friends who went',
+                style: AppTheme.heading(18, color: colors.ink)),
             const SizedBox(height: 10),
             if (liked.isNotEmpty) ...[
-              _group('👍 Liked it', const Color(0xFF3FB55D)),
+              _group('👍 Liked it', const Color(0xFF2EA85C)),
               ...liked.map(_friendRow),
             ],
             if (disliked.isNotEmpty) ...[
@@ -187,7 +275,7 @@ class _MapScreenState extends State<MapScreen> {
     final colors = context.colors;
     final t = (v.rating / 10).clamp(0.0, 1.0);
     final color =
-        Color.lerp(const Color(0xFFF5A623), const Color(0xFF3FB55D), t)!;
+        Color.lerp(const Color(0xFFEF5350), const Color(0xFF2EA85C), t)!;
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
@@ -214,7 +302,7 @@ class _MapScreenState extends State<MapScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.14),
+                color: color.withValues(alpha: 0.16),
                 borderRadius: BorderRadius.circular(10)),
             child: Text(v.rating.toStringAsFixed(0),
                 style: TextStyle(
@@ -238,10 +326,16 @@ class _MapScreenState extends State<MapScreen> {
             _controller = c;
             _recenter();
           },
-          markers: _markers(),
+          markers: _markers,
           myLocationEnabled: true,
           myLocationButtonEnabled: false,
           zoomControlsEnabled: false,
+          mapToolbarEnabled: false,
+          // Let the map win all touch gestures (so the page doesn't swipe).
+          gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
+            Factory<OneSequenceGestureRecognizer>(
+                () => EagerGestureRecognizer()),
+          },
         ),
         Positioned(
           top: 12,
@@ -262,7 +356,7 @@ class _MapScreenState extends State<MapScreen> {
                   context,
                   MaterialPageRoute(
                       builder: (_) => const CompareCategoriesScreen()),
-                ).then((_) => setState(() {})),
+                ).then((_) => _buildMarkers()),
               ),
             ],
           ),
