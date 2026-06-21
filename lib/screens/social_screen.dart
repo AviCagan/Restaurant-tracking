@@ -5,7 +5,6 @@ import '../data/social_service.dart';
 import '../models/user_profile.dart';
 import '../theme/app_theme.dart';
 import '../widgets/feed_card.dart';
-import '../widgets/gradient_app_bar.dart';
 import '../widgets/sign_in_prompt.dart';
 import 'friend_profile_screen.dart';
 import 'friends_manage_screen.dart';
@@ -23,44 +22,6 @@ class SocialScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: GradientAppBar(
-        title: 'Friends',
-        actions: [
-          ValueListenableBuilder<List<Friend>>(
-            valueListenable: SocialService.requests,
-            builder: (context, requests, _) {
-              return Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.group_outlined),
-                    tooltip: 'Manage friends',
-                    onPressed: () => _openManage(context),
-                  ),
-                  if (requests.isNotEmpty)
-                    Positioned(
-                      right: 6,
-                      top: 6,
-                      child: Container(
-                        width: 16,
-                        height: 16,
-                        decoration: const BoxDecoration(
-                            color: AppTheme.accent, shape: BoxShape.circle),
-                        child: Center(
-                          child: Text('${requests.length}',
-                              style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w800)),
-                        ),
-                      ),
-                    ),
-                ],
-              );
-            },
-          ),
-        ],
-      ),
       body: ValueListenableBuilder<UserProfile?>(
         valueListenable: AuthService.user,
         builder: (context, user, _) {
@@ -71,8 +32,33 @@ class SocialScreen extends StatelessWidget {
           }
           final feed = SocialService.feed();
           return ListView(
-            padding: const EdgeInsets.fromLTRB(0, 8, 0, 100),
+            padding: const EdgeInsets.fromLTRB(0, 12, 0, 100),
             children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+                child: Row(
+                  children: [
+                    Text('Your circle',
+                        style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            color: context.colors.ink)),
+                    const Spacer(),
+                    ValueListenableBuilder<List<Friend>>(
+                      valueListenable: SocialService.requests,
+                      builder: (context, requests, _) => TextButton.icon(
+                        onPressed: () => _openManage(context),
+                        icon: const Icon(Icons.group_outlined, size: 18),
+                        label: Text(requests.isEmpty
+                            ? 'Manage'
+                            : 'Manage (${requests.length})'),
+                        style: TextButton.styleFrom(
+                            foregroundColor: AppTheme.accent),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
               _FriendsRow(onTapFriend: (f) => _openProfile(context, f),
                   onAdd: () => _openManage(context)),
               const SizedBox(height: 8),

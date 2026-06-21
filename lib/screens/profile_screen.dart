@@ -5,11 +5,9 @@ import '../data/restaurant_database.dart';
 import '../models/restaurant.dart';
 import '../models/user_profile.dart';
 import '../theme/app_theme.dart';
-import '../widgets/gradient_app_bar.dart';
 import '../widgets/restaurant_card.dart';
 import '../widgets/sign_in_prompt.dart';
 import 'restaurant_detail_screen.dart';
-import 'settings_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -39,15 +37,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     await Navigator.push(context,
         MaterialPageRoute(builder: (_) => RestaurantDetailScreen(restaurant: r)));
     _load();
-  }
-
-  int get _visitCount =>
-      _all.fold<int>(0, (s, r) => s + r.visitCount);
-
-  double get _avg {
-    final rated = _all.where((r) => r.visitCount > 0).toList();
-    if (rated.isEmpty) return 0;
-    return rated.fold<double>(0, (s, r) => s + r.overallRating) / rated.length;
   }
 
   Future<void> _editProfile(UserProfile user) async {
@@ -100,16 +89,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget build(BuildContext context) {
     final colors = context.colors;
     return Scaffold(
-      appBar: GradientAppBar(
-        title: 'Profile',
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings_outlined),
-            onPressed: () => Navigator.push(context,
-                MaterialPageRoute(builder: (_) => const SettingsScreen())),
-          ),
-        ],
-      ),
       body: ValueListenableBuilder<UserProfile?>(
         valueListenable: AuthService.user,
         builder: (context, user, _) {
@@ -160,11 +139,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 decoration: AppTheme.panel(context, radius: 18),
                 child: Row(
                   children: [
-                    _Stat(label: 'Places', value: '${_all.length}'),
-                    _Stat(label: 'Visits', value: '$_visitCount'),
-                    _Stat(
-                        label: 'Avg',
-                        value: _avg == 0 ? '–' : _avg.toStringAsFixed(1)),
+                    _Stat(label: 'Places visited', value: '${_all.length}'),
+                    _Stat(label: 'Favorites', value: '${_favorites.length}'),
                   ],
                 ),
               ),
@@ -200,12 +176,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 icon: Icons.edit_outlined,
                 label: 'Edit profile',
                 onTap: () => _editProfile(user),
-              ),
-              _Tile(
-                icon: Icons.settings_outlined,
-                label: 'Settings',
-                onTap: () => Navigator.push(context,
-                    MaterialPageRoute(builder: (_) => const SettingsScreen())),
               ),
               _Tile(
                 icon: Icons.logout,

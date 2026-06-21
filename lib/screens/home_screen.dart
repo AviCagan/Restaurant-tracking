@@ -6,7 +6,6 @@ import '../models/restaurant.dart';
 import '../models/sort_option.dart';
 import '../services/location_service.dart';
 import '../theme/app_theme.dart';
-import '../theme/theme_controller.dart';
 import '../widgets/category_filter_sheet.dart';
 import '../widgets/restaurant_card.dart';
 import '../widgets/sort_sheet.dart';
@@ -222,31 +221,52 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     final visible = _visible;
     final showDistance = _sort.needsLocation;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       floatingActionButton: _AddButton(onTap: _openAdd),
       body: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _HeroHeader(
-              count: _all.length,
-              isDark: isDark,
-              searchController: _searchCtrl,
-              query: _query,
-              filterCount: _activeFilters.length + _activeChains.length,
-              onSearch: (v) => setState(() => _query = v),
-              onClearSearch: () {
-                _searchCtrl.clear();
-                setState(() => _query = '');
-              },
-              onFilter: _openFilter,
-              onSort: _pickSort,
-              onToggleTheme: () => ThemeController.toggle(context),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _searchCtrl,
+                      onChanged: (v) => setState(() => _query = v),
+                      decoration: InputDecoration(
+                        hintText: 'Search your spots…',
+                        prefixIcon:
+                            Icon(Icons.search, color: colors.subtle),
+                        contentPadding: EdgeInsets.zero,
+                        suffixIcon: _query.isEmpty
+                            ? null
+                            : IconButton(
+                                icon: const Icon(Icons.close, size: 18),
+                                onPressed: () {
+                                  _searchCtrl.clear();
+                                  setState(() => _query = '');
+                                },
+                              ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  _ToolButton(
+                    icon: Icons.tune_rounded,
+                    onTap: _openFilter,
+                    badge: _activeFilters.length + _activeChains.length,
+                  ),
+                  const SizedBox(width: 8),
+                  _ToolButton(
+                      icon: Icons.swap_vert_rounded, onTap: _pickSort),
+                ],
+              ),
             ),
-            const SizedBox(height: 8),
             if (_activeFilters.isNotEmpty || _activeChains.isNotEmpty)
               _ActiveFilters(
                 active: _activeFilters,
@@ -314,141 +334,30 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-class _HeroHeader extends StatelessWidget {
-  const _HeroHeader({
-    required this.count,
-    required this.isDark,
-    required this.searchController,
-    required this.query,
-    required this.filterCount,
-    required this.onSearch,
-    required this.onClearSearch,
-    required this.onFilter,
-    required this.onSort,
-    required this.onToggleTheme,
-  });
 
-  final int count;
-  final bool isDark;
-  final TextEditingController searchController;
-  final String query;
-  final int filterCount;
-  final ValueChanged<String> onSearch;
-  final VoidCallback onClearSearch;
-  final VoidCallback onFilter;
-  final VoidCallback onSort;
-  final VoidCallback onToggleTheme;
-
-  @override
-  Widget build(BuildContext context) {
-    final topInset = MediaQuery.of(context).padding.top;
-    return Container(
-      padding: EdgeInsets.fromLTRB(20, topInset + 14, 12, 18),
-      decoration: const BoxDecoration(
-        gradient: AppTheme.accentGradient,
-        borderRadius: BorderRadius.vertical(bottom: Radius.circular(28)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('My Eats',
-                        style: AppTheme.heading(30, color: Colors.white)),
-                    Text(
-                      count == 1 ? '1 spot rated' : '$count spots rated',
-                      style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.9),
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600),
-                    ),
-                  ],
-                ),
-              ),
-              _RoundButton(
-                  icon: isDark ? Icons.light_mode : Icons.dark_mode,
-                  onTap: onToggleTheme),
-              const SizedBox(width: 8),
-              _RoundButton(icon: Icons.swap_vert_rounded, onTap: onSort),
-              const SizedBox(width: 8),
-              _RoundButton(
-                  icon: Icons.tune_rounded,
-                  onTap: onFilter,
-                  badge: filterCount),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: TextField(
-              controller: searchController,
-              onChanged: onSearch,
-              style: const TextStyle(color: Color(0xFF3D3833)),
-              decoration: InputDecoration(
-                hintText: 'Search your restaurants…',
-                hintStyle: const TextStyle(color: Color(0xFF9C9088)),
-                filled: true,
-                fillColor: Colors.white,
-                prefixIcon:
-                    const Icon(Icons.search, color: Color(0xFF9C9088)),
-                contentPadding: EdgeInsets.zero,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: BorderSide.none,
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: BorderSide.none,
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: BorderSide.none,
-                ),
-                suffixIcon: query.isEmpty
-                    ? null
-                    : IconButton(
-                        icon: const Icon(Icons.close,
-                            size: 18, color: Color(0xFF9C9088)),
-                        onPressed: onClearSearch,
-                      ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _RoundButton extends StatelessWidget {
-  const _RoundButton(
-      {required this.icon, required this.onTap, this.badge = 0});
+class _ToolButton extends StatelessWidget {
+  const _ToolButton({required this.icon, required this.onTap, this.badge = 0});
   final IconData icon;
   final VoidCallback onTap;
   final int badge;
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     return Stack(
       clipBehavior: Clip.none,
       children: [
         GestureDetector(
           onTap: onTap,
           child: Container(
-            width: 40,
-            height: 40,
+            width: 52,
+            height: 52,
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.22),
-              shape: BoxShape.circle,
+              color: colors.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: colors.line),
             ),
-            child: Icon(icon, color: Colors.white, size: 20),
+            child: Icon(icon, color: colors.ink),
           ),
         ),
         if (badge > 0)
@@ -459,14 +368,14 @@ class _RoundButton extends StatelessWidget {
               padding: const EdgeInsets.all(4),
               constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
               decoration: BoxDecoration(
-                color: AppTheme.honey,
+                color: AppTheme.accent,
                 shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 1.5),
+                border: Border.all(color: colors.surface, width: 1.5),
               ),
               child: Text('$badge',
                   textAlign: TextAlign.center,
                   style: const TextStyle(
-                      color: Color(0xFF3D3833),
+                      color: Colors.white,
                       fontSize: 9,
                       fontWeight: FontWeight.w900)),
             ),
@@ -475,6 +384,7 @@ class _RoundButton extends StatelessWidget {
     );
   }
 }
+
 
 class _SwipeBackground extends StatelessWidget {
   const _SwipeBackground({
