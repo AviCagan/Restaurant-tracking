@@ -222,65 +222,31 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
     final visible = _visible;
     final showDistance = _sort.needsLocation;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       floatingActionButton: _AddButton(onTap: _openAdd),
-      body: SafeArea(
-        child: Column(
+      body: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 8, 4),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text('Restaurants',
-                        style: AppTheme.heading(32, color: colors.ink)),
-                  ),
-                  _FilterButton(
-                    count: _activeFilters.length + _activeChains.length,
-                    onTap: _openFilter,
-                  ),
-                  IconButton(
-                    onPressed: () => ThemeController.toggle(context),
-                    icon: Icon(isDark
-                        ? Icons.light_mode_outlined
-                        : Icons.dark_mode_outlined),
-                    tooltip: 'Toggle theme',
-                  ),
-                  IconButton(
-                    onPressed: _pickSort,
-                    icon: const Icon(Icons.swap_vert_rounded),
-                    tooltip: 'Sort',
-                  ),
-                ],
-              ),
+            _HeroHeader(
+              count: _all.length,
+              isDark: isDark,
+              searchController: _searchCtrl,
+              query: _query,
+              filterCount: _activeFilters.length + _activeChains.length,
+              onSearch: (v) => setState(() => _query = v),
+              onClearSearch: () {
+                _searchCtrl.clear();
+                setState(() => _query = '');
+              },
+              onFilter: _openFilter,
+              onSort: _pickSort,
+              onToggleTheme: () => ThemeController.toggle(context),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-              child: TextField(
-                controller: _searchCtrl,
-                onChanged: (v) => setState(() => _query = v),
-                decoration: InputDecoration(
-                  hintText: 'Search your restaurants…',
-                  prefixIcon: Icon(Icons.search, color: colors.subtle),
-                  contentPadding: EdgeInsets.zero,
-                  suffixIcon: _query.isEmpty
-                      ? null
-                      : IconButton(
-                          icon: const Icon(Icons.close, size: 18),
-                          onPressed: () {
-                            _searchCtrl.clear();
-                            setState(() => _query = '');
-                          },
-                        ),
-                ),
-              ),
-            ),
+            const SizedBox(height: 8),
             if (_activeFilters.isNotEmpty || _activeChains.isNotEmpty)
               _ActiveFilters(
                 active: _activeFilters,
@@ -344,7 +310,168 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ],
         ),
+    );
+  }
+}
+
+class _HeroHeader extends StatelessWidget {
+  const _HeroHeader({
+    required this.count,
+    required this.isDark,
+    required this.searchController,
+    required this.query,
+    required this.filterCount,
+    required this.onSearch,
+    required this.onClearSearch,
+    required this.onFilter,
+    required this.onSort,
+    required this.onToggleTheme,
+  });
+
+  final int count;
+  final bool isDark;
+  final TextEditingController searchController;
+  final String query;
+  final int filterCount;
+  final ValueChanged<String> onSearch;
+  final VoidCallback onClearSearch;
+  final VoidCallback onFilter;
+  final VoidCallback onSort;
+  final VoidCallback onToggleTheme;
+
+  @override
+  Widget build(BuildContext context) {
+    final topInset = MediaQuery.of(context).padding.top;
+    return Container(
+      padding: EdgeInsets.fromLTRB(20, topInset + 14, 12, 18),
+      decoration: const BoxDecoration(
+        gradient: AppTheme.accentGradient,
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(28)),
       ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('My Eats',
+                        style: AppTheme.heading(30, color: Colors.white)),
+                    Text(
+                      count == 1 ? '1 spot rated' : '$count spots rated',
+                      style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.9),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
+              ),
+              _RoundButton(
+                  icon: isDark ? Icons.light_mode : Icons.dark_mode,
+                  onTap: onToggleTheme),
+              const SizedBox(width: 8),
+              _RoundButton(icon: Icons.swap_vert_rounded, onTap: onSort),
+              const SizedBox(width: 8),
+              _RoundButton(
+                  icon: Icons.tune_rounded,
+                  onTap: onFilter,
+                  badge: filterCount),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: TextField(
+              controller: searchController,
+              onChanged: onSearch,
+              style: const TextStyle(color: Color(0xFF3D3833)),
+              decoration: InputDecoration(
+                hintText: 'Search your restaurants…',
+                hintStyle: const TextStyle(color: Color(0xFF9C9088)),
+                filled: true,
+                fillColor: Colors.white,
+                prefixIcon:
+                    const Icon(Icons.search, color: Color(0xFF9C9088)),
+                contentPadding: EdgeInsets.zero,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide.none,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide.none,
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide.none,
+                ),
+                suffixIcon: query.isEmpty
+                    ? null
+                    : IconButton(
+                        icon: const Icon(Icons.close,
+                            size: 18, color: Color(0xFF9C9088)),
+                        onPressed: onClearSearch,
+                      ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RoundButton extends StatelessWidget {
+  const _RoundButton(
+      {required this.icon, required this.onTap, this.badge = 0});
+  final IconData icon;
+  final VoidCallback onTap;
+  final int badge;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        GestureDetector(
+          onTap: onTap,
+          child: Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.22),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: Colors.white, size: 20),
+          ),
+        ),
+        if (badge > 0)
+          Positioned(
+            right: -2,
+            top: -2,
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+              decoration: BoxDecoration(
+                color: AppTheme.honey,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 1.5),
+              ),
+              child: Text('$badge',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                      color: Color(0xFF3D3833),
+                      fontSize: 9,
+                      fontWeight: FontWeight.w900)),
+            ),
+          ),
+      ],
     );
   }
 }
@@ -383,47 +510,6 @@ class _SwipeBackground extends StatelessWidget {
                   fontSize: 15)),
         ],
       ),
-    );
-  }
-}
-
-class _FilterButton extends StatelessWidget {
-  const _FilterButton({required this.count, required this.onTap});
-  final int count;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        IconButton(
-          onPressed: onTap,
-          icon: const Icon(Icons.tune_rounded),
-          tooltip: 'Filter',
-        ),
-        if (count > 0)
-          Positioned(
-            right: 4,
-            top: 4,
-            child: Container(
-              padding: const EdgeInsets.all(4),
-              constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
-              decoration: const BoxDecoration(
-                color: AppTheme.accent,
-                shape: BoxShape.circle,
-              ),
-              child: Text(
-                '$count',
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800),
-              ),
-            ),
-          ),
-      ],
     );
   }
 }

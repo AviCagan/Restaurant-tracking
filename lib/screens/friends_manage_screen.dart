@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/social_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/feed_card.dart';
+import '../widgets/gradient_app_bar.dart';
 import 'friend_profile_screen.dart';
 
 class FriendsManageScreen extends StatefulWidget {
@@ -28,7 +29,7 @@ class _FriendsManageScreenState extends State<FriendsManageScreen> {
   Widget build(BuildContext context) {
     final colors = context.colors;
     return Scaffold(
-      appBar: AppBar(title: const Text('Friends')),
+      appBar: const GradientAppBar(title: 'Friends'),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 40),
         children: [

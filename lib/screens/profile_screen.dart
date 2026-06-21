@@ -5,6 +5,7 @@ import '../data/restaurant_database.dart';
 import '../models/restaurant.dart';
 import '../models/user_profile.dart';
 import '../theme/app_theme.dart';
+import '../widgets/gradient_app_bar.dart';
 import '../widgets/restaurant_card.dart';
 import '../widgets/sign_in_prompt.dart';
 import 'restaurant_detail_screen.dart';
@@ -99,8 +100,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget build(BuildContext context) {
     final colors = context.colors;
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Profile'),
+      appBar: GradientAppBar(
+        title: 'Profile',
         actions: [
           IconButton(
             icon: const Icon(Icons.settings_outlined),

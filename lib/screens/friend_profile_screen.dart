@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/social_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/feed_card.dart';
+import '../widgets/gradient_app_bar.dart';
 
 class FriendProfileScreen extends StatelessWidget {
   const FriendProfileScreen({super.key, required this.friend});
@@ -16,7 +17,7 @@ class FriendProfileScreen extends StatelessWidget {
     final reviews = SocialService.reviewsFor(friend.name);
 
     return Scaffold(
-      appBar: AppBar(title: Text(friend.name)),
+      appBar: GradientAppBar(title: friend.name),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
         children: [

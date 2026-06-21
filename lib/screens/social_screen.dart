@@ -5,6 +5,7 @@ import '../data/social_service.dart';
 import '../models/user_profile.dart';
 import '../theme/app_theme.dart';
 import '../widgets/feed_card.dart';
+import '../widgets/gradient_app_bar.dart';
 import '../widgets/sign_in_prompt.dart';
 import 'friend_profile_screen.dart';
 import 'friends_manage_screen.dart';
@@ -22,8 +23,8 @@ class SocialScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Friends'),
+      appBar: GradientAppBar(
+        title: 'Friends',
         actions: [
           ValueListenableBuilder<List<Friend>>(
             valueListenable: SocialService.requests,
