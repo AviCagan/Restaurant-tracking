@@ -23,8 +23,13 @@ dependencies:
   image_picker: ^1.1.2
   cached_network_image: ^3.4.1
 
-  # Location (for "sort by distance")
+  # Location (for "sort by distance" + the food map)
   geolocator: ^12.0.0
+
+  # Food map + in-app place view
+  google_maps_flutter: ^2.9.0
+  webview_flutter: ^4.10.0
+  url_launcher: ^6.3.1
 
   # UI / formatting
   google_fonts: ^6.2.1

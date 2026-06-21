@@ -1,5 +1,37 @@
 import 'package:flutter/foundation.dart';
 
+import '../models/category.dart';
+
+/// A place on the food map that friends have rated.
+class MapPlace {
+  final String id;
+  final String name;
+  final String address;
+  final double lat;
+  final double lng;
+
+  /// Category keys as the friends tagged them (may be named differently from
+  /// the current user's categories — resolved via CategoryMapping).
+  final List<String> categoryKeys;
+  final List<FriendVisit> visits;
+
+  const MapPlace({
+    required this.id,
+    required this.name,
+    required this.address,
+    required this.lat,
+    required this.lng,
+    required this.categoryKeys,
+    required this.visits,
+  });
+
+  /// Weighted (here: average) rating across friends' visits, 0..10.
+  double get rating {
+    if (visits.isEmpty) return 0;
+    return visits.fold<double>(0, (s, v) => s + v.rating) / visits.length;
+  }
+}
+
 /// A friend / follow.
 class Friend {
   final String name;
@@ -148,6 +180,44 @@ class SocialService {
           f, ((h % 10) + 1).toDouble(), _reviewSnippets[h % _reviewSnippets.length]));
     }
     return out;
+  }
+
+  /// Categories your friends use — some named differently from yours, to
+  /// demo the compare/import flow. (Mock.)
+  static List<AppCategory> friendCategories() => const [
+        AppCategory(key: 'f_dairy', label: 'Dairy 🧀', iconIndex: 1),
+        AppCategory(key: 'f_meat', label: 'Fleishig 🍖', iconIndex: 2),
+        AppCategory(key: 'f_mex', label: 'Tex-Mex', iconIndex: 5),
+        AppCategory(key: 'f_chinese', label: 'Chinese', iconIndex: 6),
+        AppCategory(key: 'f_sushi', label: 'Sushi', iconIndex: 12),
+        AppCategory(key: 'f_cafe', label: 'Coffee & Cafe', iconIndex: 15),
+      ];
+
+  /// Friend-rated places for the food map (mock, around Staten Island NY).
+  static List<MapPlace> mapPlaces() {
+    const data = [
+      ('Taco Bell', '2259 Richmond Ave', 40.5827, -74.1648, ['f_mex']),
+      ('KAIFENG', '951 Jewett Ave', 40.6193, -74.1206, ['f_chinese']),
+      ('Holy Schnitzel', '438 Nome Ave', 40.5469, -74.1735, ['f_meat']),
+      ('Dairy Palace', '2216 Victory Blvd', 40.6098, -74.1330, ['f_dairy']),
+      ('Sushi Nakazawa', '1080 Bay St', 40.6149, -74.0712, ['f_sushi']),
+      ('Joe & Pat\'s', '1758 Victory Blvd', 40.6147, -74.1099, ['f_dairy']),
+      ('Mason\'s Coffee', '76 Lincoln Ave', 40.5983, -74.0908, ['f_cafe']),
+      ('Beans & Leaves', '1115 Richmond Rd', 40.5806, -74.0967, ['f_cafe']),
+      ('El Patron', '345 New Dorp Ln', 40.5732, -74.1158, ['f_mex']),
+    ];
+    return [
+      for (final d in data)
+        MapPlace(
+          id: d.$1,
+          name: d.$1,
+          address: '${d.$2}, Staten Island, NY',
+          lat: d.$3,
+          lng: d.$4,
+          categoryKeys: List<String>.from(d.$5),
+          visits: friendsAtRestaurant(d.$1),
+        ),
+    ];
   }
 
   static void addFriend(String username) {

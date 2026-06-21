@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/category_store.dart';
+import '../data/filter_state.dart';
 import '../data/restaurant_database.dart';
 import '../models/restaurant.dart';
 import '../models/sort_option.dart';
@@ -28,8 +29,8 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _loading = true;
 
   SortOption _sort = SortOption.newest;
-  final Set<String> _activeFilters = {};
-  final Set<String> _activeChains = {};
+  Set<String> get _activeFilters => FilterState.categories;
+  Set<String> get _activeChains => FilterState.chains;
   String _query = '';
 
   double? _myLat;

@@ -1,14 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
+import '../data/auth_service.dart';
+import '../models/user_profile.dart';
 import '../theme/app_theme.dart';
 import 'home_screen.dart';
+import 'map_screen.dart';
 import 'profile_screen.dart';
 import 'settings_screen.dart';
 import 'social_screen.dart';
 
-/// Root scaffold: a morphing animated header, a swipeable PageView body, and a
-/// floating pill nav that also works as a slider. Settings live top-right and
-/// are reachable from every page.
+/// Root scaffold: a clean gradient header (profile avatar top-left, settings
+/// top-right), a swipeable PageView body, and a floating pill nav that doubles
+/// as a slider with haptics. Only two tabs — profile opens from the header.
 class MainScaffold extends StatefulWidget {
   const MainScaffold({super.key});
 
@@ -20,14 +24,19 @@ class _MainScaffoldState extends State<MainScaffold> {
   int _index = 0;
   final _pageController = PageController();
 
-  static const _titles = ['My Eats', 'Friends', 'You'];
+  static const _titles = ['My Eats', 'Food Map', 'Friends'];
+  static const _subtitles = [
+    'Your rated spots',
+    'Where your friends have eaten',
+    'What your circle is eating',
+  ];
   static const _items = [
     (Icons.restaurant_rounded, 'Eats'),
+    (Icons.map_rounded, 'Map'),
     (Icons.group_rounded, 'Friends'),
-    (Icons.person_rounded, 'You'),
   ];
 
-  final _screens = const [HomeScreen(), SocialScreen(), ProfileScreen()];
+  final _screens = const [HomeScreen(), MapScreen(), SocialScreen()];
 
   @override
   void dispose() {
@@ -37,27 +46,17 @@ class _MainScaffoldState extends State<MainScaffold> {
 
   void _goTo(int i) {
     if (i == _index) return;
+    HapticFeedback.selectionClick();
     setState(() => _index = i);
     _pageController.animateToPage(i,
-        duration: const Duration(milliseconds: 300), curve: Curves.easeOutCubic);
+        duration: const Duration(milliseconds: 320), curve: Curves.easeOutCubic);
   }
 
   void _openSettings() => Navigator.push(
       context, MaterialPageRoute(builder: (_) => const SettingsScreen()));
 
-  // Each page gets a different header shape so the bar morphs as you move.
-  BorderRadius _shape(int i) {
-    switch (i) {
-      case 0:
-        return const BorderRadius.vertical(bottom: Radius.circular(30));
-      case 1:
-        return const BorderRadius.only(
-            bottomLeft: Radius.circular(10), bottomRight: Radius.circular(46));
-      default:
-        return const BorderRadius.only(
-            bottomLeft: Radius.circular(46), bottomRight: Radius.circular(10));
-    }
-  }
+  void _openProfile() => Navigator.push(
+      context, MaterialPageRoute(builder: (_) => const ProfileScreen()));
 
   @override
   Widget build(BuildContext context) {
@@ -65,39 +64,41 @@ class _MainScaffoldState extends State<MainScaffold> {
     return Scaffold(
       body: Column(
         children: [
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 320),
-            curve: Curves.easeOutCubic,
+          Container(
             width: double.infinity,
-            padding: EdgeInsets.fromLTRB(22, topInset + 14, 10, 18),
-            decoration: BoxDecoration(
+            padding: EdgeInsets.fromLTRB(16, topInset + 12, 16, 20),
+            decoration: const BoxDecoration(
               gradient: AppTheme.accentGradient,
-              borderRadius: _shape(_index),
+              borderRadius: BorderRadius.vertical(bottom: Radius.circular(30)),
             ),
             child: Row(
               children: [
+                _ProfileButton(onTap: _openProfile),
+                const SizedBox(width: 14),
                 Expanded(
                   child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 250),
-                    transitionBuilder: (child, anim) => FadeTransition(
-                      opacity: anim,
-                      child: SlideTransition(
-                        position: Tween(
-                                begin: const Offset(0, 0.4), end: Offset.zero)
-                            .animate(anim),
-                        child: child,
-                      ),
+                    duration: const Duration(milliseconds: 300),
+                    switchInCurve: Curves.easeOut,
+                    transitionBuilder: (child, anim) =>
+                        FadeTransition(opacity: anim, child: child),
+                    child: Column(
+                      key: ValueKey(_index),
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(_titles[_index],
+                            style: AppTheme.heading(26, color: Colors.white)),
+                        Text(_subtitles[_index],
+                            style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.9),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600)),
+                      ],
                     ),
-                    child: Text(_titles[_index],
-                        key: ValueKey(_index),
-                        style: AppTheme.heading(30, color: Colors.white)),
                   ),
                 ),
-                IconButton(
-                  onPressed: _openSettings,
-                  icon: const Icon(Icons.settings_outlined, color: Colors.white),
-                  tooltip: 'Settings',
-                ),
+                _CircleButton(
+                    icon: Icons.settings_outlined, onTap: _openSettings),
               ],
             ),
           ),
@@ -119,6 +120,62 @@ class _MainScaffoldState extends State<MainScaffold> {
   }
 }
 
+class _ProfileButton extends StatelessWidget {
+  const _ProfileButton({required this.onTap});
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: ValueListenableBuilder<UserProfile?>(
+        valueListenable: AuthService.user,
+        builder: (context, user, _) {
+          return Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.22),
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white.withValues(alpha: 0.5),
+                  width: 1.5),
+            ),
+            child: Center(
+              child: user == null
+                  ? const Icon(Icons.person_outline,
+                      color: Colors.white, size: 22)
+                  : Text(user.initials,
+                      style: AppTheme.heading(16, color: Colors.white)),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _CircleButton extends StatelessWidget {
+  const _CircleButton({required this.icon, required this.onTap});
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.22),
+          shape: BoxShape.circle,
+        ),
+        child: Icon(icon, color: Colors.white, size: 21),
+      ),
+    );
+  }
+}
+
 class _PillNav extends StatelessWidget {
   const _PillNav(
       {required this.index, required this.items, required this.onSelect});
@@ -132,7 +189,7 @@ class _PillNav extends StatelessWidget {
     final colors = context.colors;
     return SafeArea(
       child: Container(
-        margin: const EdgeInsets.fromLTRB(20, 0, 20, 14),
+        margin: const EdgeInsets.fromLTRB(28, 0, 28, 14),
         padding: const EdgeInsets.all(7),
         decoration: BoxDecoration(
           color: colors.surface,
@@ -145,7 +202,6 @@ class _PillNav extends StatelessWidget {
           builder: (context, c) {
             final width = c.maxWidth;
             return GestureDetector(
-              // Drag across the bar to slide between pages.
               onHorizontalDragUpdate: (d) {
                 var i = (d.localPosition.dx / width * items.length).floor();
                 if (i < 0) i = 0;
@@ -160,9 +216,9 @@ class _PillNav extends StatelessWidget {
                       onTap: () => onSelect(i),
                       behavior: HitTestBehavior.opaque,
                       child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
+                        duration: const Duration(milliseconds: 220),
                         curve: Curves.easeOut,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        padding: const EdgeInsets.symmetric(vertical: 13),
                         margin: const EdgeInsets.symmetric(horizontal: 4),
                         decoration: BoxDecoration(
                           gradient: selected ? AppTheme.accentGradient : null,
@@ -175,12 +231,16 @@ class _PillNav extends StatelessWidget {
                                 size: 22,
                                 color:
                                     selected ? Colors.white : colors.subtle),
-                            if (selected) ...[
-                              const SizedBox(width: 8),
-                              Text(items[i].$2,
-                                  style:
-                                      AppTheme.heading(15, color: Colors.white)),
-                            ],
+                            const SizedBox(width: 8),
+                            AnimatedSize(
+                              duration: const Duration(milliseconds: 220),
+                              curve: Curves.easeOut,
+                              child: selected
+                                  ? Text(items[i].$2,
+                                      style: AppTheme.heading(15,
+                                          color: Colors.white))
+                                  : const SizedBox.shrink(),
+                            ),
                           ],
                         ),
                       ),

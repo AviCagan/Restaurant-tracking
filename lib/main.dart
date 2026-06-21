@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'data/auth_service.dart';
+import 'data/category_mapping.dart';
 import 'data/category_store.dart';
 import 'screens/main_scaffold.dart';
 import 'theme/app_theme.dart';
@@ -10,6 +11,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await ThemeController.load();
   await CategoryStore.load();
+  await CategoryMapping.load();
   await AuthService.load();
   runApp(const RestaurantTrackerApp());
 }

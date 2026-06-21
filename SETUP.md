@@ -49,6 +49,25 @@ defaultConfig {
 }
 ```
 
+### Food Map — Maps SDK key (required for the map to render)
+
+The Food Map uses the **Maps SDK for Android** (already enabled on your key).
+The map renders blank until you add the key to the manifest. Inside the
+`<application>` tag in `android/app/src/main/AndroidManifest.xml` add:
+
+```xml
+<meta-data
+    android:name="com.google.android.geo.API_KEY"
+    android:value="YOUR_KEY_HERE"/>
+```
+
+(This is the same Google key. Unlike the Places features it can't be passed
+via `--dart-define`, so it does live in the manifest — keep the manifest out
+of public repos or restrict the key to your app's package + SHA-1.)
+
+For iOS later, add the key in `ios/Runner/AppDelegate.swift` via
+`GMSServices.provideAPIKey("YOUR_KEY")`.
+
 ---
 
 ## iOS permissions (for the later port)
