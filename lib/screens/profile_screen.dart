@@ -156,11 +156,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               const SizedBox(height: 20),
               Container(
                 padding: const EdgeInsets.symmetric(vertical: 16),
-                decoration: BoxDecoration(
-                  color: colors.surface,
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: colors.line),
-                ),
+                decoration: AppTheme.panel(context, radius: 18),
                 child: Row(
                   children: [
                     _Stat(label: 'Places', value: '${_all.length}'),
@@ -256,11 +252,7 @@ class _Tile extends StatelessWidget {
     final colors = context.colors;
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
-      decoration: BoxDecoration(
-        color: colors.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: colors.line),
-      ),
+      decoration: AppTheme.panel(context, radius: 16),
       child: ListTile(
         leading: Icon(icon, color: colors.ink),
         title: Text(label,

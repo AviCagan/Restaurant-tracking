@@ -279,11 +279,7 @@ class _SummaryCard extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: colors.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: colors.line),
-      ),
+      decoration: AppTheme.panel(context, radius: 20),
       child: Column(
         children: [
           Row(
@@ -458,11 +454,7 @@ class _VisitCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: colors.surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: colors.line),
-      ),
+      decoration: AppTheme.panel(context, radius: 18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -625,11 +617,7 @@ class _FriendVisitRow extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: colors.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: colors.line),
-      ),
+      decoration: AppTheme.panel(context, radius: 16),
       child: Row(
         children: [
           PersonAvatar(name: visit.friend.name, size: 38),

@@ -183,6 +183,14 @@ class VisitFormState extends State<VisitForm> {
         ),
         const SizedBox(height: 22),
 
+        const _SectionLabel('Who can see this?'),
+        const SizedBox(height: 8),
+        _PrivacyToggle(
+          value: _visibility,
+          onChanged: (v) => setState(() => _visibility = v),
+        ),
+        const SizedBox(height: 22),
+
         // ---- Optional details ----
         _DetailsToggle(
           open: _showDetails,
@@ -229,13 +237,6 @@ class VisitFormState extends State<VisitForm> {
               ],
             ),
           ),
-        ),
-        const SizedBox(height: 20),
-        const _SectionLabel('Who can see this?'),
-        const SizedBox(height: 8),
-        _PrivacyToggle(
-          value: _visibility,
-          onChanged: (v) => setState(() => _visibility = v),
         ),
         const SizedBox(height: 22),
         Row(

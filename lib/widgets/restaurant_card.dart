@@ -7,8 +7,8 @@ import '../models/price_tier.dart';
 import '../models/restaurant.dart';
 import '../theme/app_theme.dart';
 
-/// A single row in the list: photo (left), name + address + visit count
-/// (middle), averaged rating (right).
+/// A restaurant in the list: a chunky "paper" card with the score badge
+/// overlapping the photo corner.
 class RestaurantCard extends StatelessWidget {
   const RestaurantCard({
     super.key,
@@ -27,24 +27,20 @@ class RestaurantCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.colors;
     return Container(
-      decoration: BoxDecoration(
-        color: colors.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: colors.line),
-        boxShadow: AppTheme.shadow(context),
-      ),
-      clipBehavior: Clip.antiAlias,
+      decoration: AppTheme.panel(context),
+      clipBehavior: Clip.none,
       child: Material(
         color: Colors.transparent,
         child: InkWell(
+          borderRadius: BorderRadius.circular(22),
           onTap: onTap,
           onLongPress: onLongPress,
           child: Padding(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(13),
             child: Row(
               children: [
-                _Cover(restaurant: restaurant),
-                const SizedBox(width: 14),
+                _CoverWithBadge(restaurant: restaurant),
+                const SizedBox(width: 16),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -57,11 +53,7 @@ class RestaurantCard extends StatelessWidget {
                               restaurant.name,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: -0.3,
-                              ),
+                              style: AppTheme.heading(19, color: colors.ink),
                             ),
                           ),
                           if (restaurant.isFavorite) ...[
@@ -71,17 +63,9 @@ class RestaurantCard extends StatelessWidget {
                           ],
                         ],
                       ),
-                      const SizedBox(height: 3),
-                      Text(
-                        restaurant.address,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                            fontSize: 12.5, color: colors.subtle, height: 1.25),
-                      ),
                       if (restaurant.isChain &&
                           restaurant.locationDescriptor != null) ...[
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 3),
                         Row(
                           children: [
                             const Icon(Icons.place,
@@ -101,26 +85,37 @@ class RestaurantCard extends StatelessWidget {
                             ),
                           ],
                         ),
+                      ] else ...[
+                        const SizedBox(height: 3),
+                        Text(
+                          restaurant.address,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                              fontSize: 12.5,
+                              color: colors.subtle,
+                              height: 1.25),
+                        ),
                       ],
-                      const SizedBox(height: 5),
+                      const SizedBox(height: 8),
                       Wrap(
                         spacing: 6,
                         runSpacing: 6,
                         children: [
-                          _Pill(
+                          _Tag(
                             icon: Icons.event_repeat_outlined,
                             label: restaurant.visitCount == 1
                                 ? '1 visit'
                                 : '${restaurant.visitCount} visits',
                           ),
                           if (restaurant.avgPrice > 0)
-                            _Pill(
+                            _Tag(
                               icon: Icons.payments_outlined,
                               label:
                                   PriceTier.signs(restaurant.avgPrice.round()),
                             ),
                           if (distanceMeters != null)
-                            _Pill(
+                            _Tag(
                               icon: Icons.near_me_outlined,
                               label: _formatDistance(distanceMeters!),
                             ),
@@ -129,8 +124,6 @@ class RestaurantCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                const SizedBox(width: 10),
-                _RatingBadge(value: restaurant.overallRating),
               ],
             ),
           ),
@@ -145,56 +138,58 @@ class RestaurantCard extends StatelessWidget {
   }
 }
 
-class _Pill extends StatelessWidget {
-  const _Pill({required this.icon, required this.label});
+class _Tag extends StatelessWidget {
+  const _Tag({required this.icon, required this.label});
   final IconData icon;
   final String label;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final fg = colors.subtle;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
       decoration: BoxDecoration(
         color: colors.background,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: colors.line),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 12, color: fg),
+          Icon(icon, size: 12, color: colors.subtle),
           const SizedBox(width: 4),
           Text(label,
               style: TextStyle(
-                  fontSize: 11, color: fg, fontWeight: FontWeight.w600)),
+                  fontSize: 11,
+                  color: colors.subtle,
+                  fontWeight: FontWeight.w700)),
         ],
       ),
     );
   }
 }
 
-class _Cover extends StatelessWidget {
-  const _Cover({required this.restaurant});
+class _CoverWithBadge extends StatelessWidget {
+  const _CoverWithBadge({required this.restaurant});
   final Restaurant restaurant;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    const size = 74.0;
-    Widget child;
+    const size = 84.0;
 
     final cover = restaurant.coverImage;
+    Widget img;
     if (cover == null || cover.isEmpty) {
-      child = Container(
+      img = Container(
         color: colors.background,
         child: Icon(Icons.restaurant, color: colors.subtle),
       );
     } else if (restaurant.coverIsLocalFile) {
-      child = Image.file(File(cover),
+      img = Image.file(File(cover),
           fit: BoxFit.cover, errorBuilder: (_, __, ___) => _broken(colors));
     } else {
-      child = CachedNetworkImage(
+      img = CachedNetworkImage(
         imageUrl: cover,
         fit: BoxFit.cover,
         placeholder: (_, __) => Container(color: colors.background),
@@ -202,9 +197,30 @@ class _Cover extends StatelessWidget {
       );
     }
 
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(14),
-      child: SizedBox(width: size, height: size, child: child),
+    return SizedBox(
+      width: size + 8,
+      height: size + 8,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Container(
+            width: size,
+            height: size,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: colors.ink.withValues(alpha: 0.13),
+                  width: 1.5),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: img,
+          ),
+          Positioned(
+            right: -6,
+            bottom: -6,
+            child: _ScoreBadge(value: restaurant.overallRating),
+          ),
+        ],
+      ),
     );
   }
 
@@ -214,40 +230,34 @@ class _Cover extends StatelessWidget {
       );
 }
 
-class _RatingBadge extends StatelessWidget {
-  const _RatingBadge({required this.value});
+class _ScoreBadge extends StatelessWidget {
+  const _ScoreBadge({required this.value});
   final double value;
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     final t = (value / 10).clamp(0.0, 1.0);
     final color =
-        Color.lerp(const Color(0xFFF5A623), const Color(0xFF34C759), t)!;
+        Color.lerp(const Color(0xFFF5A623), const Color(0xFF3FB55D), t)!;
     final text = value == value.roundToDouble()
         ? value.toStringAsFixed(0)
         : value.toStringAsFixed(1);
 
     return Container(
-      width: 52,
-      height: 52,
+      width: 40,
+      height: 40,
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [color.withValues(alpha: 0.92), color],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: [
-          BoxShadow(
-            color: color.withValues(alpha: 0.35),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(13),
+        border: Border.all(color: colors.surface, width: 2.5),
       ),
       child: Center(
-        child: Text(text,
-            style: AppTheme.heading(21, color: Colors.white)),
+        child: Text(text, style: AppTheme.heading(16, color: Colors.white)),
       ),
     );
   }

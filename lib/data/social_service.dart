@@ -132,13 +132,20 @@ class SocialService {
     final out = <FriendVisit>[];
     for (final f in friends.value) {
       final h = '${f.username}|$restaurantName'.hashCode.abs();
-      if (h % 2 != 0) continue; // only some friends went
+      if (h % 3 == 2) continue; // most friends went
       final rating = (h % 10) + 1;
       out.add(FriendVisit(
         f,
         rating.toDouble(),
         _reviewSnippets[h % _reviewSnippets.length],
       ));
+    }
+    // Always show at least one if we have friends, so the section isn't empty.
+    if (out.isEmpty && friends.value.isNotEmpty) {
+      final f = friends.value.first;
+      final h = '${f.username}|$restaurantName'.hashCode.abs();
+      out.add(FriendVisit(
+          f, ((h % 10) + 1).toDouble(), _reviewSnippets[h % _reviewSnippets.length]));
     }
     return out;
   }

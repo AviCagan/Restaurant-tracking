@@ -164,17 +164,29 @@ class AppTheme {
     );
   }
 
-  /// Soft, warm shadow used on cards (subtle in both themes).
+  /// Hard "sticker" drop shadow (no blur) — the app's signature card look.
   static List<BoxShadow> shadow(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
     return [
       BoxShadow(
         color: dark
-            ? Colors.black.withValues(alpha: 0.30)
-            : const Color(0xFFB8855E).withValues(alpha: 0.13),
-        blurRadius: 22,
-        offset: const Offset(0, 10),
+            ? Colors.black.withValues(alpha: 0.55)
+            : const Color(0xFF7A5230).withValues(alpha: 0.16),
+        blurRadius: 0,
+        offset: const Offset(0, 4),
       ),
     ];
+  }
+
+  /// The signature "paper" card decoration: solid border + hard shadow.
+  static BoxDecoration panel(BuildContext context,
+      {Color? color, double radius = 22}) {
+    final c = context.colors;
+    return BoxDecoration(
+      color: color ?? c.surface,
+      borderRadius: BorderRadius.circular(radius),
+      border: Border.all(color: c.ink.withValues(alpha: 0.13), width: 1.5),
+      boxShadow: shadow(context),
+    );
   }
 }

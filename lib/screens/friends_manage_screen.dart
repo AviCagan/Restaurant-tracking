@@ -152,12 +152,8 @@ class _FriendTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.colors;
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(
-        color: colors.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: colors.line),
-      ),
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: AppTheme.panel(context, radius: 16),
       child: ListTile(
         onTap: onTap,
         leading: PersonAvatar(name: friend.name),
