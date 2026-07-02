@@ -106,7 +106,7 @@ lib/
 
 ## 🔜 Phase 2 — Sharing (Firebase)
 
-Planned: Google sign-in, cloud sync, and sharing via **friends/follow**,
-**groups**, and a **public feed**. The `Restaurant` model already carries
-`ownerId`, `visibility`, and `groupIds` so this layers on without a data
-migration. Setup will use `flutterfire configure`.
+Everything code-side is prepared: security rules, the Firestore schema, and
+ready-to-drop auth/friends/sync services live in [`firebase_setup/`](firebase_setup/).
+The only remaining steps need the owner's Google account — follow
+**[FIREBASE_SETUP.md](FIREBASE_SETUP.md)** (~15 minutes).

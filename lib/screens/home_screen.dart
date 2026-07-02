@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 
 import '../data/category_store.dart';
 import '../data/filter_state.dart';
+import '../data/folder_store.dart';
 import '../data/restaurant_database.dart';
 import '../models/restaurant.dart';
 import '../models/sort_option.dart';
 import '../services/location_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/category_filter_sheet.dart';
+import '../widgets/folder_sheets.dart';
 import '../widgets/restaurant_card.dart';
 import '../widgets/sort_sheet.dart';
 import 'add_restaurant_screen.dart';
@@ -32,6 +34,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Set<String> get _activeFilters => FilterState.categories;
   Set<String> get _activeChains => FilterState.chains;
   String _query = '';
+  String? _folderId; // selected folder filter (null = all)
 
   double? _myLat;
   double? _myLng;
@@ -168,6 +171,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   List<Restaurant> get _visible {
     final q = _query.trim().toLowerCase();
+    final folder = _folderId == null ? null : FolderStore.byId(_folderId!);
     var list = _all.where((r) {
       final matchesFilter = _activeFilters.isEmpty ||
           r.categoryKeys.any(_activeFilters.contains);
@@ -178,7 +182,9 @@ class _HomeScreenState extends State<HomeScreen> {
       final matchesQuery = q.isEmpty ||
           r.name.toLowerCase().contains(q) ||
           r.address.toLowerCase().contains(q);
-      return matchesFilter && matchesChain && matchesQuery;
+      final matchesFolder =
+          folder == null || folder.restaurantIds.contains(r.id);
+      return matchesFilter && matchesChain && matchesQuery && matchesFolder;
     }).toList();
 
     int byName(Restaurant a, Restaurant b) =>
@@ -268,6 +274,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
             ),
+            _FolderBar(
+              selected: _folderId,
+              onSelect: (id) => setState(() => _folderId = id),
+            ),
             if (_activeFilters.isNotEmpty || _activeChains.isNotEmpty)
               _ActiveFilters(
                 active: _activeFilters,
@@ -291,7 +301,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                 const SizedBox(height: 12),
                             itemBuilder: (_, i) {
                               final r = visible[i];
-                              return Dismissible(
+                              return _Staggered(
+                                index: i,
+                                child: Dismissible(
                                 key: ValueKey(r.id),
                                 background: const _SwipeBackground(
                                   alignment: Alignment.centerLeft,
@@ -324,6 +336,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   onTap: () => _openDetail(r),
                                   onLongPress: () => _quickAddVisit(r),
                                 ),
+                              ),
                               );
                             },
                           ),
@@ -386,6 +399,162 @@ class _ToolButton extends StatelessWidget {
   }
 }
 
+
+/// Cards drift up + fade in with a gentle per-index stagger.
+class _Staggered extends StatelessWidget {
+  const _Staggered({required this.index, required this.child});
+  final int index;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final delayFraction = (index.clamp(0, 8)) * 0.08;
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: Duration(milliseconds: 420 + index.clamp(0, 8) * 70),
+      curve: Interval(delayFraction, 1, curve: Curves.easeOutCubic),
+      builder: (context, t, child) => Opacity(
+        opacity: t,
+        child: Transform.translate(offset: Offset(0, 26 * (1 - t)), child: child),
+      ),
+      child: child,
+    );
+  }
+}
+
+/// Horizontal folder chips: All + each folder. Tap to filter, long-press to
+/// edit/delete, "+" to create.
+class _FolderBar extends StatelessWidget {
+  const _FolderBar({required this.selected, required this.onSelect});
+  final String? selected;
+  final ValueChanged<String?> onSelect;
+
+  Future<void> _longPress(BuildContext context, Folder f) async {
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: context.colors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 8),
+            ListTile(
+              leading: const Icon(Icons.edit_outlined),
+              title: const Text('Rename / change emoji'),
+              onTap: () => Navigator.pop(context, 'edit'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline),
+              title: const Text('Delete folder'),
+              subtitle: const Text('Restaurants themselves are kept'),
+              onTap: () => Navigator.pop(context, 'delete'),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (action == 'edit') {
+      if (context.mounted) await showFolderEditDialog(context, existing: f);
+    } else if (action == 'delete') {
+      await FolderStore.delete(f.id);
+      if (selected == f.id) onSelect(null);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return ValueListenableBuilder<List<Folder>>(
+      valueListenable: FolderStore.all,
+      builder: (context, folders, _) {
+        return SizedBox(
+          height: 44,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            children: [
+              _chip(context, label: 'All', emoji: '🍽️',
+                  on: selected == null, onTap: () => onSelect(null)),
+              ...folders.map((f) => _chip(
+                    context,
+                    label: '${f.name} (${f.restaurantIds.length})',
+                    emoji: f.emoji,
+                    on: selected == f.id,
+                    onTap: () => onSelect(selected == f.id ? null : f.id),
+                    onLongPress: () => _longPress(context, f),
+                  )),
+              GestureDetector(
+                onTap: () => showFolderEditDialog(context),
+                child: Container(
+                  margin: const EdgeInsets.only(right: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: colors.surface,
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(color: colors.line, width: 1.5),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.create_new_folder_outlined,
+                          size: 17, color: AppTheme.accent),
+                      const SizedBox(width: 6),
+                      Text('New',
+                          style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: colors.ink)),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _chip(BuildContext context,
+      {required String label,
+      required String emoji,
+      required bool on,
+      required VoidCallback onTap,
+      VoidCallback? onLongPress}) {
+    final colors = context.colors;
+    return GestureDetector(
+      onTap: onTap,
+      onLongPress: onLongPress,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+        margin: const EdgeInsets.only(right: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 13),
+        decoration: BoxDecoration(
+          gradient: on ? AppTheme.accentGradient : null,
+          color: on ? null : colors.surface,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(
+              color: on ? Colors.transparent : colors.line, width: 1.5),
+        ),
+        child: Row(
+          children: [
+            Text(emoji, style: const TextStyle(fontSize: 15)),
+            const SizedBox(width: 6),
+            Text(label,
+                style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: on ? Colors.white : colors.ink)),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 class _SwipeBackground extends StatelessWidget {
   const _SwipeBackground({

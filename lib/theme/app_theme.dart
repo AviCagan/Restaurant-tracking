@@ -2,9 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 /// Semantic colors that adapt between light and dark themes.
-///
-/// Widgets read these via `context.colors.subtle` etc. The brand [accent]
-/// stays constant across themes and lives on [AppTheme].
 @immutable
 class AppColors extends ThemeExtension<AppColors> {
   final Color ink; // primary text
@@ -49,20 +46,21 @@ class AppColors extends ThemeExtension<AppColors> {
     );
   }
 
+  // "Cozy kitchen" palette — warm cream, cocoa text, peachy warmth.
   static const light = AppColors(
-    ink: Color(0xFF3D3833), // warm dark
-    subtle: Color(0xFF9C9088), // warm gray
-    line: Color(0xFFECE3D8),
-    surface: Color(0xFFFFFFFF),
-    background: Color(0xFFFBF6F0), // warm cream
+    ink: Color(0xFF4A3B32), // warm cocoa
+    subtle: Color(0xFFA38F80), // latte
+    line: Color(0xFFF0E3D3), // biscuit
+    surface: Color(0xFFFFFDFA),
+    background: Color(0xFFFFF6EA), // warm cream
   );
 
   static const dark = AppColors(
-    ink: Color(0xFFF0E8DF),
-    subtle: Color(0xFFA89E93),
-    line: Color(0xFF302A22),
-    surface: Color(0xFF211C16),
-    background: Color(0xFF15110D), // warm near-black
+    ink: Color(0xFFF6ECE1),
+    subtle: Color(0xFFB5A294),
+    line: Color(0xFF3C2F26),
+    surface: Color(0xFF2B211A),
+    background: Color(0xFF201812), // warm espresso
   );
 }
 
@@ -70,21 +68,21 @@ extension AppColorsX on BuildContext {
   AppColors get colors => Theme.of(this).extension<AppColors>()!;
 }
 
-/// Sleek, modern, low-clutter theme (light + dark).
+/// Warm, friendly, cozy theme (light + dark).
 class AppTheme {
-  static const Color accent = Color(0xFFE2785A); // warm terracotta
-  static const Color accentDark = Color(0xFFC9603C);
-  static const Color honey = Color(0xFFF2B705); // warm highlight
-  static const Color sage = Color(0xFF7FA98A); // friendly green
+  static const Color accent = Color(0xFFF07A4B); // sunset peach
+  static const Color accentDark = Color(0xFFD65F31);
+  static const Color honey = Color(0xFFFFC24B);
+  static const Color sage = Color(0xFF8FBA96);
 
-  /// Friendly rounded display font for headings & big numbers.
+  /// Chubby rounded display font for headings & big numbers.
   static TextStyle heading(double size,
           {Color? color, FontWeight weight = FontWeight.w600}) =>
-      GoogleFonts.fredoka(
-          fontSize: size, fontWeight: weight, color: color, letterSpacing: 0.2);
+      GoogleFonts.baloo2(
+          fontSize: size, fontWeight: weight, color: color, height: 1.15);
 
   static const Gradient accentGradient = LinearGradient(
-    colors: [Color(0xFFEC8A5E), accentDark],
+    colors: [Color(0xFFFFA26C), accent],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
@@ -94,8 +92,8 @@ class AppTheme {
 
   static ThemeData _build(Brightness brightness, AppColors c) {
     final base = ThemeData(brightness: brightness, useMaterial3: true);
-    // Nunito: rounded, friendly, easy on the eyes.
-    final textTheme = GoogleFonts.nunitoTextTheme(base.textTheme).apply(
+    // Quicksand: soft, rounded, easy on the eyes.
+    final textTheme = GoogleFonts.quicksandTextTheme(base.textTheme).apply(
       bodyColor: c.ink,
       displayColor: c.ink,
     );
@@ -104,22 +102,25 @@ class AppTheme {
       scaffoldBackgroundColor: c.background,
       colorScheme: base.colorScheme.copyWith(
         primary: accent,
-        secondary: accent,
+        secondary: honey,
         surface: c.surface,
         onSurface: c.ink,
       ),
       extensions: [c],
       textTheme: textTheme,
+      pageTransitionsTheme: const PageTransitionsTheme(builders: {
+        TargetPlatform.android: _SoftSlidePageTransitionsBuilder(),
+        TargetPlatform.iOS: _SoftSlidePageTransitionsBuilder(),
+      }),
       appBarTheme: AppBarTheme(
         backgroundColor: c.background,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         centerTitle: false,
-        titleTextStyle: GoogleFonts.fredoka(
+        titleTextStyle: GoogleFonts.baloo2(
           color: c.ink,
-          fontSize: 27,
+          fontSize: 26,
           fontWeight: FontWeight.w600,
-          letterSpacing: 0.2,
         ),
         iconTheme: IconThemeData(color: c.ink),
       ),
@@ -127,29 +128,29 @@ class AppTheme {
         color: c.surface,
         elevation: 0,
         margin: EdgeInsets.zero,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       ),
       floatingActionButtonTheme: const FloatingActionButtonThemeData(
         backgroundColor: accent,
         foregroundColor: Colors.white,
-        elevation: 6,
+        elevation: 4,
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: c.surface,
         contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
         hintStyle: TextStyle(color: c.subtle),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(18),
           borderSide: BorderSide(color: c.line),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(18),
           borderSide: BorderSide(color: c.line),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(18),
           borderSide: const BorderSide(color: accent, width: 1.6),
         ),
       ),
@@ -161,32 +162,62 @@ class AppTheme {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
       ),
       dividerTheme: DividerThemeData(color: c.line, thickness: 1),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: c.ink,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      ),
     );
   }
 
-  /// Hard "sticker" drop shadow (no blur) — the app's signature card look.
+  /// Soft warm glow shadow — cozy, not techy.
   static List<BoxShadow> shadow(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
     return [
       BoxShadow(
         color: dark
-            ? Colors.black.withValues(alpha: 0.55)
-            : const Color(0xFF7A5230).withValues(alpha: 0.16),
-        blurRadius: 0,
-        offset: const Offset(0, 4),
+            ? Colors.black.withValues(alpha: 0.35)
+            : const Color(0xFFDBA06A).withValues(alpha: 0.20),
+        blurRadius: 20,
+        offset: const Offset(0, 8),
       ),
     ];
   }
 
-  /// The signature "paper" card decoration: solid border + hard shadow.
+  /// The signature soft card decoration.
   static BoxDecoration panel(BuildContext context,
-      {Color? color, double radius = 22}) {
+      {Color? color, double radius = 24}) {
     final c = context.colors;
     return BoxDecoration(
       color: color ?? c.surface,
       borderRadius: BorderRadius.circular(radius),
-      border: Border.all(color: c.ink.withValues(alpha: 0.13), width: 1.5),
+      border: Border.all(color: c.line, width: 1.5),
       boxShadow: shadow(context),
+    );
+  }
+}
+
+/// Gentle slide-up + fade route transition (replaces the stock zoom).
+class _SoftSlidePageTransitionsBuilder extends PageTransitionsBuilder {
+  const _SoftSlidePageTransitionsBuilder();
+
+  @override
+  Widget buildTransitions<T>(
+    PageRoute<T> route,
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    final curved =
+        CurvedAnimation(parent: animation, curve: Curves.easeOutCubic);
+    return FadeTransition(
+      opacity: curved,
+      child: SlideTransition(
+        position: Tween(begin: const Offset(0, 0.045), end: Offset.zero)
+            .animate(curved),
+        child: child,
+      ),
     );
   }
 }

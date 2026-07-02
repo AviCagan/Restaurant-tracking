@@ -12,6 +12,7 @@ import '../models/restaurant.dart';
 import '../models/visit.dart';
 import '../theme/app_theme.dart';
 import '../widgets/feed_card.dart';
+import '../widgets/folder_sheets.dart';
 import 'add_restaurant_screen.dart';
 import 'add_visit_screen.dart';
 
@@ -146,6 +147,11 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
                     ),
                   ),
                   IconButton(
+                      onPressed: () =>
+                          showAddToFolderSheet(context, _r.id, _r.name),
+                      icon: const Icon(Icons.folder_outlined),
+                      tooltip: 'Add to folder'),
+                  IconButton(
                       onPressed: _editIdentity,
                       icon: const Icon(Icons.edit_outlined)),
                   IconButton(
@@ -155,10 +161,13 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
                 flexibleSpace: cover == null
                     ? null
                     : FlexibleSpaceBar(
-                        background: _r.coverIsLocalFile
-                            ? Image.file(File(cover), fit: BoxFit.cover)
-                            : CachedNetworkImage(
-                                imageUrl: cover, fit: BoxFit.cover),
+                        background: Hero(
+                          tag: 'cover-${_r.id}',
+                          child: _r.coverIsLocalFile
+                              ? Image.file(File(cover), fit: BoxFit.cover)
+                              : CachedNetworkImage(
+                                  imageUrl: cover, fit: BoxFit.cover),
+                        ),
                       ),
               ),
               SliverToBoxAdapter(

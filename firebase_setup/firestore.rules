@@ -1,0 +1,62 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function isMe(uid) { return signedIn() && request.auth.uid == uid; }
+    // Friendship is stored symmetrically: users/{uid}/friends/{otherUid}
+    function isFriendOf(uid) {
+      return signedIn() &&
+        exists(/databases/$(database)/documents/users/$(uid)/friends/$(request.auth.uid));
+    }
+
+    match /users/{uid} {
+      // Profiles are readable by any signed-in user (needed for username search).
+      allow read: if signedIn();
+      allow create, update: if isMe(uid);
+      allow delete: if false;
+
+      match /friends/{friendUid} {
+        // You manage your own friend list; the other side is written by the
+        // accepting user via a batched write on their own doc + yours is
+        // mirrored through the request flow below.
+        allow read: if isMe(uid) || isFriendOf(uid);
+        allow write: if isMe(uid) || isMe(friendUid);
+      }
+
+      match /friendRequests/{fromUid} {
+        // The sender creates a request in the recipient's inbox;
+        // the recipient reads/deletes it.
+        allow create: if isMe(fromUid);
+        allow read, delete: if isMe(uid);
+      }
+
+      match /restaurants/{restaurantId} {
+        // Owner: full access. Friends: read only docs marked for friends.
+        allow read: if isMe(uid) ||
+          (isFriendOf(uid) && resource.data.visibility == 'friends');
+        allow write: if isMe(uid);
+      }
+
+      match /categories/{categoryId} {
+        // Friends can read categories only if the owner allows it.
+        allow read: if isMe(uid) ||
+          (isFriendOf(uid) &&
+           get(/databases/$(database)/documents/users/$(uid)).data
+             .get('categoriesViewable', true) == true);
+        allow write: if isMe(uid);
+      }
+
+      match /folders/{folderId} {
+        allow read, write: if isMe(uid); // folders are always private
+      }
+    }
+
+    // Username -> uid lookup for adding friends.
+    match /usernames/{username} {
+      allow read: if signedIn();
+      allow create: if signedIn() && request.resource.data.uid == request.auth.uid;
+      allow update, delete: if signedIn() && resource.data.uid == request.auth.uid;
+    }
+  }
+}

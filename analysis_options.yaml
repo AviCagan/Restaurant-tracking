@@ -8,3 +8,7 @@ linter:
 analyzer:
   errors:
     avoid_print: ignore
+  exclude:
+    # Ready-to-drop Phase 2 code; compiled only after `flutterfire configure`
+    # (see FIREBASE_SETUP.md).
+    - firebase_setup/**

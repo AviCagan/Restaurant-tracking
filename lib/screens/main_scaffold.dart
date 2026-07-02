@@ -72,10 +72,19 @@ class _MainScaffoldState extends State<MainScaffold> {
                 const SizedBox(width: 14),
                 Expanded(
                   child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 300),
-                    switchInCurve: Curves.easeOut,
-                    transitionBuilder: (child, anim) =>
-                        FadeTransition(opacity: anim, child: child),
+                    duration: const Duration(milliseconds: 320),
+                    switchInCurve: Curves.easeOutCubic,
+                    switchOutCurve: Curves.easeIn,
+                    transitionBuilder: (child, anim) => FadeTransition(
+                      opacity: anim,
+                      child: SlideTransition(
+                        position: Tween(
+                                begin: const Offset(0, 0.5),
+                                end: Offset.zero)
+                            .animate(anim),
+                        child: child,
+                      ),
+                    ),
                     child: Text(_titles[_index],
                         key: ValueKey(_index),
                         style: AppTheme.heading(28, color: Colors.white)),
@@ -185,36 +194,67 @@ class _PillNav extends StatelessWidget {
         child: LayoutBuilder(
           builder: (context, c) {
             final width = c.maxWidth;
+            final n = items.length;
             return GestureDetector(
               onHorizontalDragUpdate: (d) {
-                var i = (d.localPosition.dx / width * items.length).floor();
+                var i = (d.localPosition.dx / width * n).floor();
                 if (i < 0) i = 0;
-                if (i > items.length - 1) i = items.length - 1;
+                if (i > n - 1) i = n - 1;
                 onSelect(i);
               },
-              child: Row(
-                children: List.generate(items.length, (i) {
-                  final selected = i == index;
-                  return Expanded(
-                    child: GestureDetector(
-                      onTap: () => onSelect(i),
-                      behavior: HitTestBehavior.opaque,
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 220),
-                        curve: Curves.easeOut,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        margin: const EdgeInsets.symmetric(horizontal: 4),
+              child: SizedBox(
+                height: 52,
+                child: Stack(
+                  children: [
+                    // One gradient pill that glides between tabs.
+                    AnimatedAlign(
+                      duration: const Duration(milliseconds: 340),
+                      curve: Curves.easeOutBack,
+                      alignment: Alignment(
+                          n == 1 ? 0 : -1 + 2 * index / (n - 1), 0),
+                      child: Container(
+                        width: width / n,
+                        height: 52,
                         decoration: BoxDecoration(
-                          gradient: selected ? AppTheme.accentGradient : null,
+                          gradient: AppTheme.accentGradient,
                           borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color:
+                                  AppTheme.accent.withValues(alpha: 0.35),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
                         ),
-                        child: Icon(items[i].$1,
-                            size: 24,
-                            color: selected ? Colors.white : colors.subtle),
                       ),
                     ),
-                  );
-                }),
+                    Row(
+                      children: List.generate(n, (i) {
+                        final selected = i == index;
+                        return Expanded(
+                          child: GestureDetector(
+                            onTap: () => onSelect(i),
+                            behavior: HitTestBehavior.opaque,
+                            child: Center(
+                              child: AnimatedScale(
+                                duration:
+                                    const Duration(milliseconds: 300),
+                                curve: Curves.easeOutBack,
+                                scale: selected ? 1.18 : 1.0,
+                                child: Icon(items[i].$1,
+                                    size: 24,
+                                    color: selected
+                                        ? Colors.white
+                                        : colors.subtle),
+                              ),
+                            ),
+                          ),
+                        );
+                      }),
+                    ),
+                  ],
+                ),
               ),
             );
           },

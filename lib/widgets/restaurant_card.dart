@@ -113,7 +113,7 @@ class _Banner extends StatelessWidget {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          image,
+          Hero(tag: 'cover-${restaurant.id}', child: image),
           // Dark scrim for legibility.
           const DecoratedBox(
             decoration: BoxDecoration(
