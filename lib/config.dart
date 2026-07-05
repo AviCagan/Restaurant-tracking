@@ -20,5 +20,6 @@ class AppConfig {
   /// native Google sign-in to mint Firebase-compatible tokens.
   /// Found in Firebase console → Authentication → Sign-in method → Google →
   /// "Web SDK configuration". Empty = fall back to the browser redirect flow.
-  static const String googleWebClientId = '';
+  static const String googleWebClientId =
+      '16020027451-jdh3n8fra7ev1m9h5i6teu3mcnujsr3h.apps.googleusercontent.com';
 }
