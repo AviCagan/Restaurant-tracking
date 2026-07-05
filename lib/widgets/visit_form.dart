@@ -14,6 +14,7 @@ import '../services/media_storage.dart';
 import '../theme/app_theme.dart';
 import 'rating_picker_sheet.dart';
 import 'tap_rating_bar.dart';
+import '../services/haptics.dart';
 
 /// Fast, satisfying form for a single visit. Core ratings (food, atmosphere,
 /// price) are front and center; everything else lives under "Add details".
@@ -349,7 +350,7 @@ class _PriceTierSelector extends StatelessWidget {
             padding: EdgeInsets.only(right: i < 3 ? 8 : 0),
             child: GestureDetector(
               onTap: () {
-                HapticFeedback.selectionClick();
+                Haptics.tick();
                 onChanged(tier);
               },
               child: AnimatedContainer(
@@ -416,7 +417,7 @@ class _PrivacyToggle extends StatelessWidget {
       return Expanded(
         child: GestureDetector(
           onTap: () {
-            HapticFeedback.selectionClick();
+            Haptics.tick();
             onChanged(key);
           },
           child: AnimatedContainer(

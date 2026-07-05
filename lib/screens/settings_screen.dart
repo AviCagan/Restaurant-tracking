@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 import '../data/app_prefs.dart';
 import '../data/auth_service.dart';
 import '../data/firebase_services.dart';
+import '../services/haptics.dart';
 import '../theme/app_theme.dart';
 import '../theme/theme_controller.dart';
 import '../widgets/gradient_app_bar.dart';
+import 'tour_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -124,6 +126,60 @@ class SettingsScreen extends StatelessWidget {
             },
           ),
           const SizedBox(height: 24),
+          const _SectionLabel('Haptics'),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: colors.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: colors.line),
+            ),
+            child: ValueListenableBuilder<int>(
+              valueListenable: AppPrefs.hapticStrength,
+              builder: (context, strength, _) {
+                const labels = ['None', 'Light', 'Medium', 'Strong'];
+                return Row(
+                  children: List.generate(4, (i) {
+                    final on = i == strength;
+                    return Expanded(
+                      child: Padding(
+                        padding: EdgeInsets.only(right: i < 3 ? 8 : 0),
+                        child: GestureDetector(
+                          onTap: () async {
+                            await AppPrefs.setHapticStrength(i);
+                            Haptics.step(); // feel the new strength
+                          },
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 120),
+                            padding:
+                                const EdgeInsets.symmetric(vertical: 12),
+                            decoration: BoxDecoration(
+                              color:
+                                  on ? AppTheme.accent : colors.background,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                  color:
+                                      on ? AppTheme.accent : colors.line),
+                            ),
+                            child: Center(
+                              child: Text(labels[i],
+                                  style: TextStyle(
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w800,
+                                      color: on
+                                          ? Colors.white
+                                          : colors.ink)),
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 24),
           const _SectionLabel('About'),
           Container(
             decoration: BoxDecoration(
@@ -135,18 +191,18 @@ class SettingsScreen extends StatelessWidget {
               children: [
                 const ListTile(
                   leading: Icon(Icons.restaurant_menu),
-                  title: Text('Restaurant Tracker'),
-                  subtitle: Text('Version 1.0.0 (preview)'),
+                  title: Text('YUMS'),
+                  subtitle: Text('Alpha pre-release'),
                 ),
                 Divider(height: 1, color: colors.line),
                 ListTile(
-                  leading: const Icon(Icons.science_outlined,
-                      color: AppTheme.accent),
-                  title: const Text('Sharing is in preview'),
-                  subtitle: Text(
-                      'Accounts & feed are local mocks. Cloud sync via Firebase '
-                      'is the next step.',
+                  leading:
+                      const Icon(Icons.tour_outlined, color: AppTheme.accent),
+                  title: const Text('App tour'),
+                  subtitle: Text('Replay the quick intro',
                       style: TextStyle(color: colors.subtle, fontSize: 12)),
+                  trailing: Icon(Icons.chevron_right, color: colors.subtle),
+                  onTap: () => TourScreen.show(context),
                 ),
               ],
             ),

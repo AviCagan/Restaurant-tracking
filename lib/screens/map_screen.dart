@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../data/category_mapping.dart';
 import '../data/filter_state.dart';
+import '../data/friend_group_store.dart';
 import '../data/restaurant_database.dart';
 import '../data/social_service.dart';
 import '../models/restaurant.dart';
@@ -247,6 +248,10 @@ class _MapScreenState extends State<MapScreen> {
           }
 
           final colors = context.colors;
+          // Map group usernames -> display names used by the people filter.
+          final usernameToName = {
+            for (final f in SocialService.friends.value) f.username: f.name
+          };
           return SafeArea(
             child: ListView(
               shrinkWrap: true,
@@ -267,6 +272,36 @@ class _MapScreenState extends State<MapScreen> {
                     ],
                   ),
                 ),
+                if (FriendGroupStore.all.value.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: FriendGroupStore.all.value.map((g) {
+                        final members = g.usernames
+                            .map((u) => usernameToName[u])
+                            .whereType<String>()
+                            .toSet();
+                        final on = members.isNotEmpty &&
+                            _people.length == members.length &&
+                            _people.containsAll(members);
+                        return FilterChip(
+                          selected: on,
+                          selectedColor:
+                              AppTheme.accent.withValues(alpha: 0.18),
+                          checkmarkColor: AppTheme.accent,
+                          avatar: Text(g.emoji,
+                              style: const TextStyle(fontSize: 14)),
+                          label: Text(g.name),
+                          onSelected: (_) => toggle(() {
+                            _people.clear();
+                            if (!on) _people.addAll(members);
+                          }),
+                        );
+                      }).toList(),
+                    ),
+                  ),
                 ..._peopleList.map((name) {
                   final on = _people.isEmpty || _people.contains(name);
                   return CheckboxListTile(

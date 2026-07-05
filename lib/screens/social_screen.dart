@@ -1,23 +1,47 @@
 import 'package:flutter/material.dart';
 
 import '../data/auth_service.dart';
+import '../data/friend_group_store.dart';
 import '../data/social_service.dart';
 import '../models/user_profile.dart';
 import '../theme/app_theme.dart';
 import '../widgets/feed_card.dart';
+import '../widgets/group_sheets.dart';
 import '../widgets/sign_in_prompt.dart';
 import 'friend_profile_screen.dart';
 import 'friends_manage_screen.dart';
 
-/// Combined Friends + Feed: a row of friends up top, their shared ratings below.
-class SocialScreen extends StatelessWidget {
+/// Combined Friends + Feed: a row of friends up top, their shared ratings
+/// below, filterable by friend group.
+class SocialScreen extends StatefulWidget {
   const SocialScreen({super.key});
+
+  @override
+  State<SocialScreen> createState() => _SocialScreenState();
+}
+
+class _SocialScreenState extends State<SocialScreen> {
+  String? _groupId; // null = everyone
 
   void _openManage(BuildContext context) => Navigator.push(context,
       MaterialPageRoute(builder: (_) => const FriendsManageScreen()));
 
   void _openProfile(BuildContext context, Friend f) => Navigator.push(context,
       MaterialPageRoute(builder: (_) => FriendProfileScreen(friend: f)));
+
+  List<FeedItem> _filteredFeed() {
+    final feed = SocialService.feed();
+    final group = _groupId == null ? null : FriendGroupStore.byId(_groupId!);
+    if (group == null) return feed;
+    // Map friend names -> usernames to match against the group.
+    final nameToUsername = {
+      for (final f in SocialService.friends.value) f.name: f.username
+    };
+    return feed
+        .where((i) =>
+            group.usernames.contains(nameToUsername[i.friendName] ?? ''))
+        .toList();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -30,7 +54,7 @@ class SocialScreen extends StatelessWidget {
                 message:
                     'Add friends to share ratings and see what they\'re eating.');
           }
-          final feed = SocialService.feed();
+          final feed = _filteredFeed();
           return ListView(
             padding: const EdgeInsets.fromLTRB(0, 12, 0, 100),
             children: [
@@ -38,7 +62,7 @@ class SocialScreen extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
                 child: Row(
                   children: [
-                    Text('Your circle',
+                    Text('Your table',
                         style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w800,
@@ -63,13 +87,30 @@ class SocialScreen extends StatelessWidget {
                   onAdd: () => _openManage(context)),
               const SizedBox(height: 8),
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                child: Text('Recent from friends',
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                child: Text('Fresh bites',
                     style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w800,
                         color: context.colors.ink)),
               ),
+              _GroupChips(
+                selected: _groupId,
+                onSelect: (id) => setState(() => _groupId = id),
+              ),
+              const SizedBox(height: 4),
+              if (feed.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Text(
+                    _groupId == null
+                        ? 'Nothing here yet — once friends share ratings, '
+                            'they\'ll show up right here.'
+                        : 'No shared ratings from this group yet.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: context.colors.subtle),
+                  ),
+                ),
               ...feed.map((f) => Padding(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -78,6 +119,105 @@ class SocialScreen extends StatelessWidget {
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+/// Group filter chips: Everyone + each group (long-press to edit) + New.
+class _GroupChips extends StatelessWidget {
+  const _GroupChips({required this.selected, required this.onSelect});
+  final String? selected;
+  final ValueChanged<String?> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return ValueListenableBuilder<List<FriendGroup>>(
+      valueListenable: FriendGroupStore.all,
+      builder: (context, groups, _) {
+        return SizedBox(
+          height: 40,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            children: [
+              _chip(context, '👥', 'Everyone', selected == null,
+                  () => onSelect(null)),
+              ...groups.map((g) => _chip(
+                    context,
+                    g.emoji,
+                    g.name,
+                    selected == g.id,
+                    () => onSelect(selected == g.id ? null : g.id),
+                    onLongPress: () async {
+                      final changed = await showGroupEditDialog(context,
+                          existing: g);
+                      if (changed && FriendGroupStore.byId(g.id) == null) {
+                        onSelect(null); // group deleted
+                      }
+                    },
+                  )),
+              GestureDetector(
+                onTap: () => showGroupEditDialog(context),
+                child: Container(
+                  margin: const EdgeInsets.only(right: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: colors.surface,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: colors.line, width: 1.5),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.group_add_outlined,
+                          size: 16, color: AppTheme.accent),
+                      const SizedBox(width: 6),
+                      Text('New group',
+                          style: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w700,
+                              color: colors.ink)),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _chip(BuildContext context, String emoji, String label, bool on,
+      VoidCallback onTap,
+      {VoidCallback? onLongPress}) {
+    final colors = context.colors;
+    return GestureDetector(
+      onTap: onTap,
+      onLongPress: onLongPress,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        margin: const EdgeInsets.only(right: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        decoration: BoxDecoration(
+          gradient: on ? AppTheme.accentGradient : null,
+          color: on ? null : colors.surface,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+              color: on ? Colors.transparent : colors.line, width: 1.5),
+        ),
+        child: Row(
+          children: [
+            Text(emoji, style: const TextStyle(fontSize: 14)),
+            const SizedBox(width: 6),
+            Text(label,
+                style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                    color: on ? Colors.white : colors.ink)),
+          ],
+        ),
       ),
     );
   }

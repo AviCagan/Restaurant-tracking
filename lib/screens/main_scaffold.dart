@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
+import '../data/app_prefs.dart';
 import '../data/auth_service.dart';
 import '../models/user_profile.dart';
+import 'tour_screen.dart';
 import '../theme/app_theme.dart';
 import 'home_screen.dart';
 import 'map_screen.dart';
 import 'profile_screen.dart';
 import 'settings_screen.dart';
 import 'social_screen.dart';
+import '../services/haptics.dart';
 
 /// Root scaffold: a clean gradient header (profile avatar top-left, settings
 /// top-right), a swipeable PageView body, and a floating pill nav that doubles
@@ -23,6 +25,17 @@ class MainScaffold extends StatefulWidget {
 class _MainScaffoldState extends State<MainScaffold> {
   int _index = 0;
   final _pageController = PageController();
+
+  @override
+  void initState() {
+    super.initState();
+    // First time in the app: show the quick tour.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!AppPrefs.tourSeen.value && mounted) {
+        TourScreen.show(context);
+      }
+    });
+  }
 
   static const _titles = ['My Eats', 'Food Map', 'Friends'];
   static const _items = [
@@ -41,7 +54,7 @@ class _MainScaffoldState extends State<MainScaffold> {
 
   void _goTo(int i) {
     if (i == _index) return;
-    HapticFeedback.selectionClick();
+    Haptics.tick();
     setState(() => _index = i);
     _pageController.animateToPage(i,
         duration: const Duration(milliseconds: 320), curve: Curves.easeOutCubic);
@@ -72,16 +85,18 @@ class _MainScaffoldState extends State<MainScaffold> {
                 const SizedBox(width: 14),
                 Expanded(
                   child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 320),
-                    switchInCurve: Curves.easeOutCubic,
-                    switchOutCurve: Curves.easeIn,
+                    duration: const Duration(milliseconds: 240),
+                    switchInCurve: const Interval(0.4, 1, curve: Curves.easeOut),
+                    switchOutCurve: const Interval(0.6, 1, curve: Curves.easeIn),
+                    layoutBuilder: (current, previous) => Stack(
+                      alignment: Alignment.centerLeft,
+                      children: [...previous, if (current != null) current],
+                    ),
                     transitionBuilder: (child, anim) => FadeTransition(
                       opacity: anim,
-                      child: SlideTransition(
-                        position: Tween(
-                                begin: const Offset(0, 0.5),
-                                end: Offset.zero)
-                            .animate(anim),
+                      child: ScaleTransition(
+                        scale: Tween(begin: 0.96, end: 1.0).animate(anim),
+                        alignment: Alignment.centerLeft,
                         child: child,
                       ),
                     ),

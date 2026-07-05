@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb;
+import 'package:flutter/foundation.dart' show ValueNotifier;
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
@@ -21,18 +22,33 @@ import 'social_service.dart';
 class CloudBoot {
   static StreamSubscription? _authSub;
 
+  /// True when a Google account is signed in but hasn't finished the quick
+  /// profile setup (name / username / categories) yet.
+  static final ValueNotifier<bool> needsSetup = ValueNotifier<bool>(false);
+
   static void init() {
     _authSub?.cancel();
     _authSub = fb.FirebaseAuth.instance.authStateChanges().listen((user) async {
       if (user != null) {
-        await FirebaseAuthService.loadProfile(user);
-        _CloudSocial.start(user.uid);
-        _CloudSync.start(user.uid);
+        final snap = await FirebaseFirestore.instance
+            .collection('users').doc(user.uid).get();
+        if (snap.exists && (snap.data()?.containsKey('username') ?? false)) {
+          await FirebaseAuthService.loadProfile(user);
+          startServices(user.uid);
+        } else {
+          needsSetup.value = true; // brand new — run the setup screen
+        }
       } else {
+        needsSetup.value = false;
         _CloudSocial.stop();
         _CloudSync.stop();
       }
     });
+  }
+
+  static void startServices(String uid) {
+    _CloudSocial.start(uid);
+    _CloudSync.start(uid);
   }
 }
 
@@ -59,37 +75,78 @@ class FirebaseAuthService {
       user = cred.user;
     }
     if (user == null) return null;
-    return loadProfile(user);
+    final snap = await _db.collection('users').doc(user.uid).get();
+    if (snap.exists && (snap.data()?.containsKey('username') ?? false)) {
+      return loadProfile(user);
+    }
+    CloudBoot.needsSetup.value = true; // new user -> quick setup screen
+    return null;
   }
 
-  /// Loads (or creates) the Firestore profile and mirrors it locally.
-  static Future<UserProfile> loadProfile(fb.User user) async {
-    final doc = _db.collection('users').doc(user.uid);
-    final snap = await doc.get();
-    UserProfile profile;
-    if (snap.exists && snap.data()!.containsKey('username')) {
-      final d = snap.data()!;
-      profile = UserProfile(
-        id: user.uid,
-        name: d['name'] as String? ?? user.displayName ?? 'You',
-        username: d['username'] as String? ?? 'you',
-        bio: d['bio'] as String? ?? '',
-      );
-    } else {
-      final username = await _claimUsername(user);
-      profile = UserProfile(
-          id: user.uid,
-          name: user.displayName ?? 'You',
-          username: username);
-      await doc.set({
-        'name': profile.name,
-        'username': profile.username,
-        'bio': '',
-        'categoriesViewable': AppPrefs.categoriesViewable.value,
-        'defaultVisibility': AppPrefs.defaultVisibility.value,
-        'createdAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+  /// Suggested username for the setup screen, derived from the account email.
+  static String suggestedUsername() {
+    final user = fb.FirebaseAuth.instance.currentUser;
+    var base = (user?.email ?? 'foodie').split('@').first.toLowerCase();
+    base = base.replaceAll(RegExp(r'[^a-z0-9_]'), '');
+    return base.isEmpty ? 'foodie' : base;
+  }
+
+  static String suggestedName() =>
+      fb.FirebaseAuth.instance.currentUser?.displayName ?? '';
+
+  /// Finishes first-time setup: claims the chosen username and creates the
+  /// profile. Returns an error message, or null on success.
+  static Future<String?> completeSetup(String name, String username) async {
+    final user = fb.FirebaseAuth.instance.currentUser;
+    if (user == null) return 'Not signed in.';
+    final clean =
+        username.trim().toLowerCase().replaceAll(RegExp(r'[^a-z0-9_]'), '');
+    if (clean.length < 3) return 'Username needs at least 3 characters.';
+
+    final ref = _db.collection('usernames').doc(clean);
+    try {
+      await _db.runTransaction((tx) async {
+        final s = await tx.get(ref);
+        if (s.exists && s.data()!['uid'] != user.uid) {
+          throw Exception('taken');
+        }
+        tx.set(ref, {'uid': user.uid});
+      });
+    } catch (_) {
+      return 'That username is taken — try another.';
     }
+
+    final profile = UserProfile(
+        id: user.uid,
+        name: name.trim().isEmpty ? (user.displayName ?? 'You') : name.trim(),
+        username: clean);
+    await _db.collection('users').doc(user.uid).set({
+      'name': profile.name,
+      'username': profile.username,
+      'bio': '',
+      'categoriesViewable': AppPrefs.categoriesViewable.value,
+      'defaultVisibility': AppPrefs.defaultVisibility.value,
+      'createdAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+
+    AuthService.onProfileChanged = null;
+    await AuthService.updateProfile(profile);
+    AuthService.onProfileChanged = _pushProfile;
+    CloudBoot.startServices(user.uid);
+    CloudBoot.needsSetup.value = false;
+    return null;
+  }
+
+  /// Loads an existing Firestore profile and mirrors it locally.
+  static Future<UserProfile> loadProfile(fb.User user) async {
+    final snap = await _db.collection('users').doc(user.uid).get();
+    final d = snap.data() ?? {};
+    final profile = UserProfile(
+      id: user.uid,
+      name: d['name'] as String? ?? user.displayName ?? 'You',
+      username: d['username'] as String? ?? 'you',
+      bio: d['bio'] as String? ?? '',
+    );
     // Mirror into the local auth (drives every screen). Avoid feedback loop:
     AuthService.onProfileChanged = null;
     await AuthService.updateProfile(profile);
@@ -110,31 +167,6 @@ class FirebaseAuthService {
       await _db.collection('usernames').doc(p.username.toLowerCase()).set(
           {'uid': uid});
     } catch (_) {}
-  }
-
-  static Future<String> _claimUsername(fb.User user) async {
-    var base = (user.email ?? 'user').split('@').first.toLowerCase();
-    base = base.replaceAll(RegExp(r'[^a-z0-9_]'), '');
-    if (base.isEmpty) base = 'user';
-    var candidate = base;
-    var i = 0;
-    while (i < 50) {
-      final ref = _db.collection('usernames').doc(candidate);
-      try {
-        await _db.runTransaction((tx) async {
-          final s = await tx.get(ref);
-          if (s.exists && s.data()!['uid'] != user.uid) {
-            throw Exception('taken');
-          }
-          tx.set(ref, {'uid': user.uid});
-        });
-        return candidate;
-      } catch (_) {
-        i++;
-        candidate = '$base$i';
-      }
-    }
-    return '$base${user.uid.substring(0, 4)}';
   }
 
   static Future<void> signOut() async {

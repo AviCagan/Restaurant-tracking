@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../theme/app_theme.dart';
+import '../services/haptics.dart';
 
 /// A sleek bottom sheet for picking a 1–10 rating (or clearing it).
 ///
@@ -66,7 +66,7 @@ class RatingPickerSheet extends StatelessWidget {
                     const Color(0xFFF5A623), const Color(0xFF34C759), t)!;
                 return GestureDetector(
                   onTap: () {
-                    HapticFeedback.selectionClick();
+                    Haptics.tick();
                     Navigator.pop(context, n);
                   },
                   child: Container(

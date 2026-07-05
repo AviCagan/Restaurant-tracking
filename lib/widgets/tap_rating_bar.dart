@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../theme/app_theme.dart';
+import '../services/haptics.dart';
 
 /// A fast, satisfying 1–10 rating control: tap or drag across the segments.
 /// Segments fill with an amber→green gradient, each step fires a heavy haptic,
@@ -38,7 +38,7 @@ class _TapRatingBarState extends State<TapRatingBar> {
     if (i < 1) i = 1;
     if (i > 10) i = 10;
     if (i != widget.value) {
-      HapticFeedback.heavyImpact();
+      Haptics.step();
       widget.onChanged(i);
     }
   }
