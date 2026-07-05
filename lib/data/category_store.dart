@@ -26,10 +26,14 @@ class CategoryStore {
     all.value = list.isEmpty ? List.of(defaultCategories) : list;
   }
 
+  /// Set by the cloud layer to mirror category changes to Firestore.
+  static void Function()? onChanged;
+
   static Future<void> _save() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(
         _key, jsonEncode(all.value.map((c) => c.toJson()).toList()));
+    onChanged?.call();
   }
 
   static Future<AppCategory> add(String label, {int iconIndex = 0}) async {

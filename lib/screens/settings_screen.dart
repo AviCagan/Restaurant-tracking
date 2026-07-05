@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data/app_prefs.dart';
 import '../data/auth_service.dart';
+import '../data/firebase_services.dart';
 import '../theme/app_theme.dart';
 import '../theme/theme_controller.dart';
 import '../widgets/gradient_app_bar.dart';
@@ -102,14 +103,22 @@ class SettingsScreen extends StatelessWidget {
                 child: user == null
                     ? ListTile(
                         leading: const Icon(Icons.login),
-                        title: const Text('Sign in'),
-                        onTap: () => AuthService.signInDemo(),
+                        title: const Text('Sign in with Google'),
+                        onTap: () async {
+                          try {
+                            await FirebaseAuthService.signInWithGoogle();
+                          } catch (_) {
+                            await AuthService.signInDemo();
+                          }
+                        },
                       )
                     : ListTile(
                         leading: const Icon(Icons.logout),
                         title: const Text('Sign out'),
                         subtitle: Text('@${user.username}'),
-                        onTap: () => AuthService.signOut(),
+                        onTap: () => FirebaseAuthService.isCloudSignedIn
+                            ? FirebaseAuthService.signOut()
+                            : AuthService.signOut(),
                       ),
               );
             },

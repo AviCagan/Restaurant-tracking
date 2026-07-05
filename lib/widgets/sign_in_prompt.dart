@@ -1,14 +1,38 @@
 import 'package:flutter/material.dart';
 
 import '../data/auth_service.dart';
+import '../data/firebase_services.dart';
 import '../theme/app_theme.dart';
 
 /// Shown on social tabs when the user isn't signed in.
-class SignInPrompt extends StatelessWidget {
+class SignInPrompt extends StatefulWidget {
   const SignInPrompt({super.key, required this.message, this.onSignedIn});
 
   final String message;
   final VoidCallback? onSignedIn;
+
+  @override
+  State<SignInPrompt> createState() => _SignInPromptState();
+}
+
+class _SignInPromptState extends State<SignInPrompt> {
+  bool _busy = false;
+
+  Future<void> _google() async {
+    setState(() => _busy = true);
+    try {
+      final profile = await FirebaseAuthService.signInWithGoogle();
+      if (profile != null) widget.onSignedIn?.call();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Sign-in didn\'t work — check your internet '
+                'connection and try again.')));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -19,12 +43,12 @@ class SignInPrompt extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.group_outlined, size: 64, color: colors.subtle),
-            const SizedBox(height: 16),
-            const Text('Sign in to connect',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+            const Text('👋', style: TextStyle(fontSize: 52)),
+            const SizedBox(height: 12),
+            Text('Sign in to connect',
+                style: AppTheme.heading(22, color: colors.ink)),
             const SizedBox(height: 8),
-            Text(message,
+            Text(widget.message,
                 textAlign: TextAlign.center,
                 style: TextStyle(color: colors.subtle)),
             const SizedBox(height: 24),
@@ -37,19 +61,30 @@ class SignInPrompt extends StatelessWidget {
                       borderRadius: BorderRadius.circular(16)),
                   padding: const EdgeInsets.symmetric(horizontal: 28),
                 ),
-                onPressed: () async {
-                  await AuthService.signInDemo();
-                  onSignedIn?.call();
-                },
-                icon: const Icon(Icons.login),
-                label: const Text('Continue (demo)',
+                onPressed: _busy ? null : _google,
+                icon: _busy
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white))
+                    : const Icon(Icons.login),
+                label: const Text('Continue with Google',
                     style: TextStyle(
                         fontSize: 16, fontWeight: FontWeight.w800)),
               ),
             ),
-            const SizedBox(height: 12),
-            Text('Preview: accounts & syncing are local for now.',
-                style: TextStyle(fontSize: 11.5, color: colors.subtle)),
+            const SizedBox(height: 10),
+            TextButton(
+              onPressed: _busy
+                  ? null
+                  : () async {
+                      await AuthService.signInDemo();
+                      widget.onSignedIn?.call();
+                    },
+              child: Text('Just exploring? Try the demo',
+                  style: TextStyle(color: colors.subtle, fontSize: 13)),
+            ),
           ],
         ),
       ),

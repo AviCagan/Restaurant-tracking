@@ -1,0 +1,476 @@
+import 'dart:async';
+import 'dart:io';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart' as fb;
+import 'package:firebase_storage/firebase_storage.dart';
+
+import '../models/category.dart';
+import '../models/restaurant.dart';
+import '../models/user_profile.dart';
+import 'app_prefs.dart';
+import 'auth_service.dart';
+import 'category_store.dart';
+import 'restaurant_database.dart';
+import 'social_service.dart';
+
+/// Boots the cloud layer: watches Firebase auth state and starts/stops the
+/// live sync. Call once from main() after Firebase.initializeApp.
+class CloudBoot {
+  static StreamSubscription? _authSub;
+
+  static void init() {
+    _authSub?.cancel();
+    _authSub = fb.FirebaseAuth.instance.authStateChanges().listen((user) async {
+      if (user != null) {
+        await FirebaseAuthService.loadProfile(user);
+        _CloudSocial.start(user.uid);
+        _CloudSync.start(user.uid);
+      } else {
+        _CloudSocial.stop();
+        _CloudSync.stop();
+      }
+    });
+  }
+}
+
+class FirebaseAuthService {
+  static FirebaseFirestore get _db => FirebaseFirestore.instance;
+
+  /// Native Google sign-in (no extra client-id plumbing needed).
+  static Future<UserProfile?> signInWithGoogle() async {
+    final provider = fb.GoogleAuthProvider();
+    final cred =
+        await fb.FirebaseAuth.instance.signInWithProvider(provider);
+    final user = cred.user;
+    if (user == null) return null;
+    return loadProfile(user);
+  }
+
+  /// Loads (or creates) the Firestore profile and mirrors it locally.
+  static Future<UserProfile> loadProfile(fb.User user) async {
+    final doc = _db.collection('users').doc(user.uid);
+    final snap = await doc.get();
+    UserProfile profile;
+    if (snap.exists && snap.data()!.containsKey('username')) {
+      final d = snap.data()!;
+      profile = UserProfile(
+        id: user.uid,
+        name: d['name'] as String? ?? user.displayName ?? 'You',
+        username: d['username'] as String? ?? 'you',
+        bio: d['bio'] as String? ?? '',
+      );
+    } else {
+      final username = await _claimUsername(user);
+      profile = UserProfile(
+          id: user.uid,
+          name: user.displayName ?? 'You',
+          username: username);
+      await doc.set({
+        'name': profile.name,
+        'username': profile.username,
+        'bio': '',
+        'categoriesViewable': AppPrefs.categoriesViewable.value,
+        'defaultVisibility': AppPrefs.defaultVisibility.value,
+        'createdAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    }
+    // Mirror into the local auth (drives every screen). Avoid feedback loop:
+    AuthService.onProfileChanged = null;
+    await AuthService.updateProfile(profile);
+    AuthService.onProfileChanged = _pushProfile;
+    return profile;
+  }
+
+  static Future<void> _pushProfile(UserProfile p) async {
+    final uid = fb.FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+    await _db.collection('users').doc(uid).set({
+      'name': p.name,
+      'username': p.username,
+      'bio': p.bio,
+    }, SetOptions(merge: true));
+    // Best-effort username claim for the (possibly new) handle.
+    try {
+      await _db.collection('usernames').doc(p.username.toLowerCase()).set(
+          {'uid': uid});
+    } catch (_) {}
+  }
+
+  static Future<String> _claimUsername(fb.User user) async {
+    var base = (user.email ?? 'user').split('@').first.toLowerCase();
+    base = base.replaceAll(RegExp(r'[^a-z0-9_]'), '');
+    if (base.isEmpty) base = 'user';
+    var candidate = base;
+    var i = 0;
+    while (i < 50) {
+      final ref = _db.collection('usernames').doc(candidate);
+      try {
+        await _db.runTransaction((tx) async {
+          final s = await tx.get(ref);
+          if (s.exists && s.data()!['uid'] != user.uid) {
+            throw Exception('taken');
+          }
+          tx.set(ref, {'uid': user.uid});
+        });
+        return candidate;
+      } catch (_) {
+        i++;
+        candidate = '$base$i';
+      }
+    }
+    return '$base${user.uid.substring(0, 4)}';
+  }
+
+  static Future<void> signOut() async {
+    await fb.FirebaseAuth.instance.signOut();
+    await AuthService.signOut();
+    SocialService.resetToDemo();
+  }
+
+  static bool get isCloudSignedIn =>
+      fb.FirebaseAuth.instance.currentUser != null;
+}
+
+/// Live friends / requests / shared-restaurant data -> SocialService caches.
+class _CloudSocial {
+  static FirebaseFirestore get _db => FirebaseFirestore.instance;
+  static String? _uid;
+  static StreamSubscription? _friendsSub;
+  static StreamSubscription? _requestsSub;
+  static final Map<String, StreamSubscription> _restaurantSubs = {};
+  static final Map<String, List<Restaurant>> _friendRestaurants = {};
+  static final Map<String, Friend> _friendByUid = {};
+
+  static void start(String uid) {
+    stop();
+    _uid = uid;
+    SocialService.cloudMode = true;
+    SocialService.friends.value = [];
+    SocialService.requests.value = [];
+    SocialService.cloudAddFriend = _sendRequest;
+    SocialService.cloudRemoveFriend = _removeFriend;
+    SocialService.cloudAcceptRequest = _accept;
+    SocialService.cloudDeclineRequest = _decline;
+
+    _friendsSub = _db
+        .collection('users').doc(uid).collection('friends')
+        .snapshots()
+        .listen((snap) {
+      _friendByUid.clear();
+      for (final d in snap.docs) {
+        _friendByUid[d.id] = Friend(
+            d.data()['name'] as String? ?? 'Friend',
+            d.data()['username'] as String? ?? d.id);
+      }
+      SocialService.friends.value = _friendByUid.values.toList();
+      _syncRestaurantListeners();
+    });
+
+    _requestsSub = _db
+        .collection('users').doc(uid).collection('friendRequests')
+        .snapshots()
+        .listen((snap) {
+      SocialService.requests.value = [
+        for (final d in snap.docs)
+          Friend(d.data()['name'] as String? ?? 'Someone',
+              d.data()['username'] as String? ?? d.id)
+      ];
+    });
+  }
+
+  static void stop() {
+    _friendsSub?.cancel();
+    _requestsSub?.cancel();
+    for (final s in _restaurantSubs.values) {
+      s.cancel();
+    }
+    _restaurantSubs.clear();
+    _friendRestaurants.clear();
+    _friendByUid.clear();
+    _uid = null;
+  }
+
+  static void _syncRestaurantListeners() {
+    // Drop listeners for removed friends.
+    for (final uid in _restaurantSubs.keys.toList()) {
+      if (!_friendByUid.containsKey(uid)) {
+        _restaurantSubs.remove(uid)?.cancel();
+        _friendRestaurants.remove(uid);
+      }
+    }
+    // Add listeners for new friends.
+    for (final uid in _friendByUid.keys) {
+      if (_restaurantSubs.containsKey(uid)) continue;
+      _restaurantSubs[uid] = _db
+          .collection('users').doc(uid).collection('restaurants')
+          .where('visibility', isEqualTo: 'friends')
+          .snapshots()
+          .listen((snap) {
+        _friendRestaurants[uid] = [
+          for (final d in snap.docs)
+            if (_tryParse(d.data()) case final r?) r
+        ];
+        _rebuildCaches();
+      }, onError: (_) {});
+      _fetchCategories(uid);
+    }
+    _rebuildCaches();
+  }
+
+  static Restaurant? _tryParse(Map<String, dynamic> data) {
+    try {
+      return Restaurant.fromMap(data);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<void> _fetchCategories(String uid) async {
+    final friend = _friendByUid[uid];
+    if (friend == null) return;
+    try {
+      final snap = await _db
+          .collection('users').doc(uid).collection('categories').get();
+      SocialService.cloudCategories[friend.name] = [
+        for (final d in snap.docs)
+          AppCategory(
+            key: d.data()['key'] as String? ?? d.id,
+            label: d.data()['label'] as String? ?? 'Category',
+            iconIndex: (d.data()['iconIndex'] as num?)?.toInt() ?? 0,
+          )
+      ];
+    } catch (_) {
+      // Friend keeps categories private — rules deny the read.
+      SocialService.cloudCategories[friend.name] = const [];
+    }
+  }
+
+  static void _rebuildCaches() {
+    final feed = <FeedItem>[];
+    final places = <MapPlace>[];
+    final at = <String, List<FriendVisit>>{};
+    final favorites = <String, List<String>>{};
+    final reviews = <String, List<FeedItem>>{};
+
+    _friendRestaurants.forEach((uid, restaurants) {
+      final friend = _friendByUid[uid];
+      if (friend == null) return;
+      for (final r in restaurants) {
+        final sharedVisits =
+            r.visits.where((v) => v.visibility == 'friends').toList();
+        if (sharedVisits.isEmpty) continue;
+        sharedVisits.sort((a, b) => b.date.compareTo(a.date));
+        final latest = sharedVisits.first;
+        final rating = sharedVisits.fold<double>(
+                0, (s, v) => s + (v.foodRating + v.atmosphereRating) / 2) /
+            sharedVisits.length;
+        final location = r.locationDescriptor ?? r.address;
+
+        final item = FeedItem(
+          friendName: friend.name,
+          restaurantName: r.name,
+          location: location,
+          rating: rating,
+          when: latest.date,
+          note: latest.notes,
+        );
+        feed.add(item);
+        (reviews[friend.name] ??= []).add(item);
+
+        final visit = FriendVisit(friend, rating, latest.notes);
+        (at[r.name.trim().toLowerCase()] ??= []).add(visit);
+
+        if (r.isFavorite) (favorites[friend.name] ??= []).add(r.name);
+
+        if (r.lat != null && r.lng != null) {
+          places.add(MapPlace(
+            id: '$uid-${r.id}',
+            name: r.name,
+            address: r.address,
+            lat: r.lat!,
+            lng: r.lng!,
+            categoryKeys: r.categoryKeys,
+            visits: [visit],
+          ));
+        }
+      }
+    });
+
+    SocialService.cloudFeed = feed;
+    SocialService.cloudPlaces = places;
+    SocialService.cloudAt = at;
+    SocialService.cloudFavorites = favorites;
+    SocialService.cloudReviews = reviews;
+    // Nudge listeners so open screens rebuild.
+    SocialService.friends.value = List.of(SocialService.friends.value);
+  }
+
+  // ---- Actions ----
+
+  static Future<bool> _sendRequest(String username) async {
+    final me = AuthService.user.value;
+    final uid = _uid;
+    if (me == null || uid == null) return false;
+    final lookup =
+        await _db.collection('usernames').doc(username.toLowerCase()).get();
+    if (!lookup.exists) return false;
+    final targetUid = lookup.data()!['uid'] as String;
+    if (targetUid == uid) return false;
+    await _db
+        .collection('users').doc(targetUid)
+        .collection('friendRequests').doc(uid)
+        .set({
+      'name': me.name,
+      'username': me.username,
+      'sentAt': FieldValue.serverTimestamp(),
+    });
+    return true;
+  }
+
+  static Future<String?> _uidForUsername(String username) async {
+    final snap =
+        await _db.collection('usernames').doc(username.toLowerCase()).get();
+    return snap.exists ? snap.data()!['uid'] as String : null;
+  }
+
+  static Future<void> _accept(Friend f) async {
+    final uid = _uid;
+    final me = AuthService.user.value;
+    if (uid == null || me == null) return;
+    final fromUid = await _uidForUsername(f.username);
+    if (fromUid == null) return;
+    final batch = _db.batch();
+    batch.set(
+        _db.collection('users').doc(uid).collection('friends').doc(fromUid),
+        {'name': f.name, 'username': f.username,
+         'since': FieldValue.serverTimestamp()});
+    batch.set(
+        _db.collection('users').doc(fromUid).collection('friends').doc(uid),
+        {'name': me.name, 'username': me.username,
+         'since': FieldValue.serverTimestamp()});
+    batch.delete(_db.collection('users').doc(uid)
+        .collection('friendRequests').doc(fromUid));
+    await batch.commit();
+  }
+
+  static Future<void> _decline(Friend f) async {
+    final uid = _uid;
+    if (uid == null) return;
+    final fromUid = await _uidForUsername(f.username);
+    if (fromUid == null) return;
+    await _db.collection('users').doc(uid)
+        .collection('friendRequests').doc(fromUid).delete();
+  }
+
+  static Future<void> _removeFriend(Friend f) async {
+    final uid = _uid;
+    if (uid == null) return;
+    final otherUid = await _uidForUsername(f.username);
+    if (otherUid == null) return;
+    final batch = _db.batch();
+    batch.delete(
+        _db.collection('users').doc(uid).collection('friends').doc(otherUid));
+    batch.delete(
+        _db.collection('users').doc(otherUid).collection('friends').doc(uid));
+    await batch.commit();
+  }
+}
+
+/// Pushes your local data (restaurants, categories, prefs) to Firestore.
+class _CloudSync {
+  static FirebaseFirestore get _db => FirebaseFirestore.instance;
+  static FirebaseStorage get _storage => FirebaseStorage.instance;
+  static String? _uid;
+
+  static void start(String uid) {
+    _uid = uid;
+    RestaurantDatabase.onUpsert = (r) => _pushRestaurant(r);
+    RestaurantDatabase.onDelete = (id) => _deleteRestaurant(id);
+    CategoryStore.onChanged = _pushCategories;
+    AppPrefs.categoriesViewable.addListener(_pushPrefs);
+    AppPrefs.defaultVisibility.addListener(_pushPrefs);
+    _initialPush();
+  }
+
+  static void stop() {
+    _uid = null;
+    RestaurantDatabase.onUpsert = null;
+    RestaurantDatabase.onDelete = null;
+    CategoryStore.onChanged = null;
+    AppPrefs.categoriesViewable.removeListener(_pushPrefs);
+    AppPrefs.defaultVisibility.removeListener(_pushPrefs);
+  }
+
+  static Future<void> _initialPush() async {
+    try {
+      final all = await RestaurantDatabase.instance.getAll();
+      for (final r in all) {
+        await _pushRestaurant(r);
+      }
+      await _pushCategories();
+      await _pushPrefs();
+    } catch (_) {
+      // Offline — Firestore's queue will catch writes when back online.
+    }
+  }
+
+  static Future<void> _pushRestaurant(Restaurant r) async {
+    final uid = _uid;
+    if (uid == null) return;
+    try {
+      final map = r.toMap();
+      map['visibility'] = r.visits.any((v) => v.visibility == 'friends')
+          ? 'friends'
+          : 'private';
+      // Upload the cover once so friends can see it.
+      final cover = r.customPhotoPath;
+      if (cover != null && cover.isNotEmpty && File(cover).existsSync()) {
+        final ref = _storage.ref('users/$uid/photos/${r.id}-cover.jpg');
+        try {
+          await ref.getMetadata(); // already uploaded
+        } catch (_) {
+          await ref.putFile(File(cover));
+        }
+        map['photoUrl'] = await ref.getDownloadURL();
+      }
+      map.remove('customPhotoPath'); // local path is meaningless to others
+      await _db.collection('users').doc(uid)
+          .collection('restaurants').doc(r.id).set(map);
+    } catch (_) {}
+  }
+
+  static Future<void> _deleteRestaurant(String id) async {
+    final uid = _uid;
+    if (uid == null) return;
+    try {
+      await _db.collection('users').doc(uid)
+          .collection('restaurants').doc(id).delete();
+    } catch (_) {}
+  }
+
+  static Future<void> _pushCategories() async {
+    final uid = _uid;
+    if (uid == null) return;
+    try {
+      final batch = _db.batch();
+      for (final c in CategoryStore.all.value) {
+        batch.set(
+            _db.collection('users').doc(uid).collection('categories').doc(c.key),
+            {'key': c.key, 'label': c.label, 'iconIndex': c.iconIndex});
+      }
+      await batch.commit();
+    } catch (_) {}
+  }
+
+  static Future<void> _pushPrefs() async {
+    final uid = _uid;
+    if (uid == null) return;
+    try {
+      await _db.collection('users').doc(uid).set({
+        'categoriesViewable': AppPrefs.categoriesViewable.value,
+        'defaultVisibility': AppPrefs.defaultVisibility.value,
+      }, SetOptions(merge: true));
+    } catch (_) {}
+  }
+}

@@ -74,9 +74,23 @@ class FriendVisit {
   bool get liked => rating >= 7;
 }
 
-/// Mock social backend for the Phase 2 preview. Phase 2 proper replaces this
-/// with Firestore (friends, follows, groups, public feed).
+/// Social backend. In demo mode it serves mock data; when the Firebase layer
+/// signs in it flips [cloudMode] on, keeps these same notifiers/getters
+/// populated from Firestore, and delegates all actions to the cloud.
 class SocialService {
+  // ---- Cloud plumbing (set by lib/data/firebase_services.dart) ----
+  static bool cloudMode = false;
+  static Future<bool> Function(String username)? cloudAddFriend;
+  static Future<void> Function(Friend f)? cloudRemoveFriend;
+  static Future<void> Function(Friend f)? cloudAcceptRequest;
+  static Future<void> Function(Friend f)? cloudDeclineRequest;
+  static List<FeedItem> cloudFeed = [];
+  static List<MapPlace> cloudPlaces = [];
+  static Map<String, List<FriendVisit>> cloudAt = {}; // by lowercased name
+  static Map<String, List<String>> cloudFavorites = {}; // by friend name
+  static Map<String, List<FeedItem>> cloudReviews = {}; // by friend name
+  static Map<String, List<AppCategory>> cloudCategories = {}; // by friend name
+
   static final ValueNotifier<List<Friend>> friends = ValueNotifier([
     const Friend('Maya Cohen', 'mayaeats'),
     const Friend('Daniel Roth', 'danroth'),
@@ -88,7 +102,30 @@ class SocialService {
     const Friend('Noa Bar', 'noab'),
   ]);
 
+  /// Called by the cloud layer on sign-out to restore the demo data.
+  static void resetToDemo() {
+    cloudMode = false;
+    cloudFeed = [];
+    cloudPlaces = [];
+    cloudAt = {};
+    cloudFavorites = {};
+    cloudReviews = {};
+    cloudCategories = {};
+    friends.value = [
+      const Friend('Maya Cohen', 'mayaeats'),
+      const Friend('Daniel Roth', 'danroth'),
+      const Friend('Sara Levi', 'saralevi'),
+    ];
+    requests.value = [
+      const Friend('Avi Friedman', 'avif'),
+      const Friend('Noa Bar', 'noab'),
+    ];
+  }
+
   static List<FeedItem> feed() {
+    if (cloudMode) {
+      return [...cloudFeed]..sort((a, b) => b.when.compareTo(a.when));
+    }
     final now = DateTime.now();
     return [
       FeedItem(
@@ -125,8 +162,9 @@ class SocialService {
     ];
   }
 
-  /// A friend's favorite restaurants (mock).
+  /// A friend's favorite restaurants.
   static List<String> favoritesFor(String friendName) {
+    if (cloudMode) return cloudFavorites[friendName] ?? const [];
     switch (friendName) {
       case 'Maya Cohen':
         return ['Dairy Palace', 'Taco Bell', 'Holy Schnitzel'];
@@ -139,8 +177,12 @@ class SocialService {
     }
   }
 
-  /// A friend's reviews shared with friends (mock) — newest first.
+  /// A friend's reviews shared with friends — newest first.
   static List<FeedItem> reviewsFor(String friendName) {
+    if (cloudMode) {
+      return [...(cloudReviews[friendName] ?? const [])]
+        ..sort((a, b) => b.when.compareTo(a.when));
+    }
     return feed().where((f) => f.friendName == friendName).toList()
       ..sort((a, b) => b.when.compareTo(a.when));
   }
@@ -161,6 +203,9 @@ class SocialService {
   /// Friends who have been to [restaurantName] (mock, deterministic from the
   /// friends list so it stays stable per restaurant).
   static List<FriendVisit> friendsAtRestaurant(String restaurantName) {
+    if (cloudMode) {
+      return cloudAt[restaurantName.trim().toLowerCase()] ?? const [];
+    }
     final out = <FriendVisit>[];
     for (final f in friends.value) {
       final h = '${f.username}|$restaurantName'.hashCode.abs();
@@ -193,9 +238,9 @@ class SocialService {
         AppCategory(key: 'f_cafe', label: 'Coffee & Cafe', iconIndex: 15),
       ];
 
-  /// A specific friend's categories (mock — a deterministic subset, so each
-  /// friend looks a little different).
+  /// A specific friend's categories.
   static List<AppCategory> categoriesFor(String friendName) {
+    if (cloudMode) return cloudCategories[friendName] ?? const [];
     final all = [...friendCategories()];
     all.sort((a, b) => '${a.key}$friendName'
         .hashCode
@@ -203,8 +248,9 @@ class SocialService {
     return all.take(4).toList();
   }
 
-  /// Friend-rated places for the food map (mock, around Staten Island NY).
+  /// Friend-rated places for the food map.
   static List<MapPlace> mapPlaces() {
+    if (cloudMode) return cloudPlaces;
     const data = [
       ('Taco Bell', '2259 Richmond Ave', 40.5827, -74.1648, ['f_mex']),
       ('KAIFENG', '951 Jewett Ave', 40.6193, -74.1206, ['f_chinese']),
@@ -233,6 +279,10 @@ class SocialService {
   static void addFriend(String username) {
     final clean = username.trim().replaceAll('@', '');
     if (clean.isEmpty) return;
+    if (cloudMode) {
+      cloudAddFriend?.call(clean); // sends a friend request
+      return;
+    }
     friends.value = [
       ...friends.value,
       Friend(clean, clean.toLowerCase()),
@@ -240,16 +290,28 @@ class SocialService {
   }
 
   static void removeFriend(Friend f) {
+    if (cloudMode) {
+      cloudRemoveFriend?.call(f);
+      return;
+    }
     friends.value = friends.value.where((x) => x.username != f.username).toList();
   }
 
   static void acceptRequest(Friend f) {
+    if (cloudMode) {
+      cloudAcceptRequest?.call(f);
+      return;
+    }
     requests.value =
         requests.value.where((x) => x.username != f.username).toList();
     friends.value = [...friends.value, f];
   }
 
   static void declineRequest(Friend f) {
+    if (cloudMode) {
+      cloudDeclineRequest?.call(f);
+      return;
+    }
     requests.value =
         requests.value.where((x) => x.username != f.username).toList();
   }

@@ -43,9 +43,13 @@ class AuthService {
     await _save();
   }
 
+  /// Set by the cloud layer to mirror profile edits to Firestore.
+  static Future<void> Function(UserProfile profile)? onProfileChanged;
+
   static Future<void> updateProfile(UserProfile profile) async {
     user.value = profile;
     await _save();
+    await onProfileChanged?.call(profile);
   }
 
   static Future<void> signOut() async {

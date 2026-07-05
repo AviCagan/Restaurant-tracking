@@ -1,10 +1,13 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 
 import 'data/app_prefs.dart';
 import 'data/auth_service.dart';
 import 'data/category_mapping.dart';
 import 'data/category_store.dart';
+import 'data/firebase_services.dart';
 import 'data/folder_store.dart';
+import 'firebase_options.dart';
 import 'screens/main_scaffold.dart';
 import 'theme/app_theme.dart';
 import 'theme/theme_controller.dart';
@@ -17,6 +20,17 @@ Future<void> main() async {
   await AppPrefs.load();
   await FolderStore.load();
   await AuthService.load();
+
+  // Cloud layer — if Firebase isn't configured on this machine, the app
+  // simply keeps running local-only.
+  try {
+    await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform);
+    CloudBoot.init();
+  } catch (e) {
+    debugPrint('Firebase unavailable, running local-only: $e');
+  }
+
   runApp(const RestaurantTrackerApp());
 }
 

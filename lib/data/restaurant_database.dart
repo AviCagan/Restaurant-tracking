@@ -112,6 +112,10 @@ class RestaurantDatabase {
     return Restaurant.fromMap(rows.first);
   }
 
+  /// Set by the cloud layer to mirror local changes to Firestore.
+  static void Function(Restaurant r)? onUpsert;
+  static void Function(String id)? onDelete;
+
   Future<void> upsert(Restaurant r) async {
     final db = await _database;
     await db.insert(
@@ -119,10 +123,12 @@ class RestaurantDatabase {
       r.toMap(),
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
+    onUpsert?.call(r);
   }
 
   Future<void> delete(String id) async {
     final db = await _database;
     await db.delete(_table, where: 'id = ?', whereArgs: [id]);
+    onDelete?.call(id);
   }
 }

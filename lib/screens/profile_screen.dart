@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/auth_service.dart';
+import '../data/firebase_services.dart';
 import '../data/restaurant_database.dart';
 import '../models/restaurant.dart';
 import '../models/user_profile.dart';
@@ -193,7 +194,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
               _Tile(
                 icon: Icons.logout,
                 label: 'Sign out',
-                onTap: () => AuthService.signOut(),
+                onTap: () => FirebaseAuthService.isCloudSignedIn
+                    ? FirebaseAuthService.signOut()
+                    : AuthService.signOut(),
               ),
             ],
           );

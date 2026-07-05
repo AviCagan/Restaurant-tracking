@@ -1,7 +1,10 @@
-# Phase 2 — Firebase Setup (do this when you're back)
+# Phase 2 — Firebase Setup
 
-Everything code-side is prepared. These are the only steps that need **your**
-Google account. Total time: ~15 minutes.
+> **STATUS: DONE.** ✅ The owner completed steps 1–4 and the code wiring
+> (packages, Google sign-in, live friend/restaurant sync) is merged in
+> `lib/data/firebase_services.dart` — no `google_sign_in` package needed;
+> sign-in uses `FirebaseAuth.signInWithProvider`. The steps below are kept
+> for reference / setting up a new machine.
 
 ## 1. Create the Firebase project (5 min)
 1. Go to https://console.firebase.google.com/ → **Add project**.
