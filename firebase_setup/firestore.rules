@@ -31,6 +31,13 @@ service cloud.firestore {
         allow read, delete: if isMe(uid);
       }
 
+      match /planInvites/{inviteId} {
+        // A friend drops a "let's eat here" invite in your inbox.
+        allow create: if signedIn() &&
+          request.resource.data.fromUid == request.auth.uid;
+        allow read, delete: if isMe(uid);
+      }
+
       match /restaurants/{restaurantId} {
         // Owner: full access. Friends: read only docs marked for friends.
         allow read: if isMe(uid) ||

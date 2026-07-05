@@ -7,6 +7,7 @@ import 'package:firebase_auth/firebase_auth.dart' as fb;
 import 'package:flutter/foundation.dart' show ValueNotifier;
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:intl/intl.dart';
 
 import '../config.dart';
 import '../models/category.dart';
@@ -17,6 +18,7 @@ import 'app_prefs.dart';
 import 'auth_service.dart';
 import 'category_store.dart';
 import 'friend_group_store.dart';
+import 'plan_store.dart';
 import 'restaurant_database.dart';
 import 'social_service.dart';
 
@@ -191,6 +193,7 @@ class _CloudSocial {
   static String? _uid;
   static StreamSubscription? _friendsSub;
   static StreamSubscription? _requestsSub;
+  static StreamSubscription? _invitesSub;
   static final Map<String, StreamSubscription> _restaurantSubs = {};
   static final Map<String, List<Restaurant>> _friendRestaurants = {};
   static final Map<String, Friend> _friendByUid = {};
@@ -205,6 +208,49 @@ class _CloudSocial {
     SocialService.cloudRemoveFriend = _removeFriend;
     SocialService.cloudAcceptRequest = _accept;
     SocialService.cloudDeclineRequest = _decline;
+    SocialService.cloudSendInvite = _sendPlanInvite;
+
+    var invitesFirst = true;
+    _invitesSub = _db
+        .collection('users').doc(uid).collection('planInvites')
+        .snapshots()
+        .listen((snap) {
+      final invites = <PlanInvite>[];
+      for (final d in snap.docs) {
+        final data = d.data();
+        final when = DateTime.fromMillisecondsSinceEpoch(
+            (data['when'] as num?)?.toInt() ?? 0);
+        if (when.isBefore(
+            DateTime.now().subtract(const Duration(days: 1)))) {
+          continue; // stale
+        }
+        invites.add(PlanInvite(
+          id: d.id,
+          fromName: data['fromName'] as String? ?? 'A friend',
+          restaurantName: data['restaurantName'] as String? ?? 'a restaurant',
+          address: data['address'] as String? ?? '',
+          when: when,
+        ));
+      }
+      invites.sort((a, b) => a.when.compareTo(b.when));
+      SocialService.invites.value = invites;
+      if (!invitesFirst) {
+        for (final change in snap.docChanges) {
+          if (change.type != DocumentChangeType.added) continue;
+          final data = change.doc.data() ?? {};
+          final when = DateTime.fromMillisecondsSinceEpoch(
+              (data['when'] as num?)?.toInt() ?? 0);
+          NotificationService.show(
+            '${data['fromName'] ?? 'A friend'} invited you! 🎉',
+            '${data['restaurantName'] ?? 'A restaurant'} · '
+                '${DateFormat.MMMEd().add_jm().format(when)}',
+            id: change.doc.id.hashCode & 0x7fffffff,
+          );
+          break;
+        }
+      }
+      invitesFirst = false;
+    }, onError: (_) {});
 
     _friendsSub = _db
         .collection('users').doc(uid).collection('friends')
@@ -235,6 +281,7 @@ class _CloudSocial {
   static void stop() {
     _friendsSub?.cancel();
     _requestsSub?.cancel();
+    _invitesSub?.cancel();
     for (final s in _restaurantSubs.values) {
       s.cancel();
     }
@@ -459,6 +506,29 @@ class _CloudSocial {
     if (fromUid == null) return;
     await _db.collection('users').doc(uid)
         .collection('friendRequests').doc(fromUid).delete();
+  }
+
+  /// Writes a plan invite into a friend's inbox (they get notified live).
+  static Future<void> _sendPlanInvite(String username, Plan plan) async {
+    final uid = _uid;
+    final me = AuthService.user.value;
+    if (uid == null || me == null) return;
+    final targetUid = await _uidForUsername(username);
+    if (targetUid == null) return;
+    try {
+      await _db
+          .collection('users').doc(targetUid)
+          .collection('planInvites').doc('${plan.id}_$uid')
+          .set({
+        'fromUid': uid,
+        'fromName': me.name,
+        'fromUsername': me.username,
+        'restaurantName': plan.restaurantName,
+        'address': plan.address,
+        'when': plan.when.millisecondsSinceEpoch,
+        'sentAt': FieldValue.serverTimestamp(),
+      });
+    } catch (_) {}
   }
 
   static Future<void> _removeFriend(Friend f) async {

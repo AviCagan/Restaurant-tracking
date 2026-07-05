@@ -8,6 +8,7 @@ import 'data/category_store.dart';
 import 'data/firebase_services.dart';
 import 'data/folder_store.dart';
 import 'data/friend_group_store.dart';
+import 'data/plan_store.dart';
 import 'firebase_options.dart';
 import 'models/user_profile.dart';
 import 'screens/main_scaffold.dart';
@@ -24,6 +25,7 @@ Future<void> main() async {
   await AppPrefs.load();
   await FolderStore.load();
   await FriendGroupStore.load();
+  await PlanStore.load();
   await AuthService.load();
 
   // Cloud layer — if Firebase isn't configured on this machine, the app

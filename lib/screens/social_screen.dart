@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../data/auth_service.dart';
+import 'package:intl/intl.dart';
+
 import '../data/friend_group_store.dart';
+import '../data/plan_store.dart';
 import '../data/social_service.dart';
 import '../models/user_profile.dart';
 import '../theme/app_theme.dart';
@@ -85,6 +88,7 @@ class _SocialScreenState extends State<SocialScreen> {
               ),
               _FriendsRow(onTapFriend: (f) => _openProfile(context, f),
                   onAdd: () => _openManage(context)),
+              const _UpcomingPlans(),
               const SizedBox(height: 8),
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
@@ -119,6 +123,99 @@ class _SocialScreenState extends State<SocialScreen> {
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+/// Upcoming plans: your own plans + invites friends sent you.
+class _UpcomingPlans extends StatelessWidget {
+  const _UpcomingPlans();
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return ValueListenableBuilder<List<Plan>>(
+      valueListenable: PlanStore.all,
+      builder: (context, plans, _) {
+        return ValueListenableBuilder<List<PlanInvite>>(
+          valueListenable: SocialService.invites,
+          builder: (context, invites, _) {
+            final upcoming = plans
+                .where((p) => p.when.isAfter(
+                    DateTime.now().subtract(const Duration(hours: 3))))
+                .toList();
+            if (upcoming.isEmpty && invites.isEmpty) {
+              return const SizedBox.shrink();
+            }
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
+                  child: Text('Upcoming plans',
+                      style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: colors.ink)),
+                ),
+                ...upcoming.map((p) => _planRow(
+                      context,
+                      emoji: '📅',
+                      title: p.restaurantName,
+                      subtitle:
+                          '${DateFormat.MMMEd().add_jm().format(p.when)}'
+                          '${p.friendUsernames.isEmpty ? '' : ' · ${p.friendUsernames.length} invited'}',
+                      onDelete: () => PlanStore.delete(p.id),
+                    )),
+                ...invites.map((i) => _planRow(
+                      context,
+                      emoji: '💌',
+                      title: '${i.fromName} → ${i.restaurantName}',
+                      subtitle: DateFormat.MMMEd().add_jm().format(i.when),
+                    )),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _planRow(BuildContext context,
+      {required String emoji,
+      required String title,
+      required String subtitle,
+      VoidCallback? onDelete}) {
+    final colors = context.colors;
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: AppTheme.panel(context, radius: 16),
+      child: Row(
+        children: [
+          Text(emoji, style: const TextStyle(fontSize: 20)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w800, fontSize: 14)),
+                Text(subtitle,
+                    style: TextStyle(fontSize: 12, color: colors.subtle)),
+              ],
+            ),
+          ),
+          if (onDelete != null)
+            IconButton(
+              icon: Icon(Icons.close, size: 18, color: colors.subtle),
+              onPressed: onDelete,
+            ),
+        ],
       ),
     );
   }

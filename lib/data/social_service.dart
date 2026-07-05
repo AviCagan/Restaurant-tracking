@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../models/category.dart';
+import 'plan_store.dart';
 
 /// A place on the food map that friends have rated.
 class MapPlace {
@@ -91,6 +92,13 @@ class SocialService {
   static Map<String, List<FeedItem>> cloudReviews = {}; // by friend name
   static Map<String, List<AppCategory>> cloudCategories = {}; // by friend name
 
+  /// Plan invites friends sent you (live from the cloud).
+  static final ValueNotifier<List<PlanInvite>> invites =
+      ValueNotifier<List<PlanInvite>>([]);
+
+  /// Set by the cloud layer: sends a plan invite to a friend by username.
+  static Future<void> Function(String username, Plan plan)? cloudSendInvite;
+
   static final ValueNotifier<List<Friend>> friends = ValueNotifier([
     const Friend('Maya Cohen', 'mayaeats'),
     const Friend('Daniel Roth', 'danroth'),
@@ -111,6 +119,7 @@ class SocialService {
     cloudFavorites = {};
     cloudReviews = {};
     cloudCategories = {};
+    invites.value = [];
     friends.value = [
       const Friend('Maya Cohen', 'mayaeats'),
       const Friend('Daniel Roth', 'danroth'),
