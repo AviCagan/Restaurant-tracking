@@ -31,28 +31,49 @@ Future<bool> showFolderEditDialog(BuildContext context,
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
-                children: folderEmojis.map((e) {
-                  final on = e == emoji;
-                  return GestureDetector(
-                    onTap: () => setState(() => emoji = e),
+                children: [
+                  // Defaults, plus the current emoji if it's a custom one.
+                  ...{...folderEmojis, emoji}.map((e) {
+                    final on = e == emoji;
+                    return GestureDetector(
+                      onTap: () => setState(() => emoji = e),
+                      child: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: on
+                              ? AppTheme.accent.withValues(alpha: 0.18)
+                              : colors.background,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                              color:
+                                  on ? AppTheme.accent : Colors.transparent),
+                        ),
+                        child: Center(
+                            child: Text(e,
+                                style: const TextStyle(fontSize: 20))),
+                      ),
+                    );
+                  }),
+                  // "+" — pick any emoji from your keyboard.
+                  GestureDetector(
+                    onTap: () async {
+                      final custom = await _askCustomEmoji(context);
+                      if (custom != null) setState(() => emoji = custom);
+                    },
                     child: Container(
                       width: 40,
                       height: 40,
                       decoration: BoxDecoration(
-                        color: on
-                            ? AppTheme.accent.withValues(alpha: 0.18)
-                            : colors.background,
+                        color: colors.background,
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                            color:
-                                on ? AppTheme.accent : Colors.transparent),
+                        border: Border.all(color: colors.line),
                       ),
-                      child: Center(
-                          child:
-                              Text(e, style: const TextStyle(fontSize: 20))),
+                      child: const Icon(Icons.add,
+                          size: 20, color: AppTheme.accent),
                     ),
-                  );
-                }).toList(),
+                  ),
+                ],
               ),
             ],
           ),
@@ -83,6 +104,49 @@ Future<bool> showFolderEditDialog(BuildContext context,
     return true;
   }
   return false;
+}
+
+/// Asks for any emoji via the phone's emoji keyboard. Returns the first
+/// emoji typed, or null if cancelled/empty.
+Future<String?> _askCustomEmoji(BuildContext context) async {
+  final ctrl = TextEditingController();
+  final result = await showDialog<String>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: const Text('Pick any emoji'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: ctrl,
+            autofocus: true,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 32),
+            decoration: const InputDecoration(hintText: '😋'),
+          ),
+          const SizedBox(height: 8),
+          Text('Tap the emoji key on your keyboard',
+              style: TextStyle(
+                  fontSize: 12, color: dialogContext.colors.subtle)),
+        ],
+      ),
+      actions: [
+        TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel')),
+        FilledButton(
+          style: FilledButton.styleFrom(backgroundColor: AppTheme.accent),
+          onPressed: () {
+            final text = ctrl.text.trim();
+            Navigator.pop(dialogContext,
+                text.isEmpty ? null : text.characters.first.toString());
+          },
+          child: const Text('Use it'),
+        ),
+      ],
+    ),
+  );
+  return (result == null || result.isEmpty) ? null : result;
 }
 
 /// Bottom sheet with checkboxes to put [restaurantId] into folders.
