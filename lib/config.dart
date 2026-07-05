@@ -15,4 +15,10 @@ class AppConfig {
   /// are available. If no key is supplied the app still works — you just
   /// type the address manually and add your own photo.
   static bool get hasPlacesKey => googleMapsApiKey.isNotEmpty;
+
+  /// The Firebase project's *Web client ID* (a public identifier), used by
+  /// native Google sign-in to mint Firebase-compatible tokens.
+  /// Found in Firebase console → Authentication → Sign-in method → Google →
+  /// "Web SDK configuration". Empty = fall back to the browser redirect flow.
+  static const String googleWebClientId = '';
 }

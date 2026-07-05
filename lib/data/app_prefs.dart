@@ -14,10 +14,23 @@ class AppPrefs {
   static final ValueNotifier<bool> categoriesViewable =
       ValueNotifier<bool>(true);
 
+  static const _localModeKey = 'local_mode';
+
+  /// True when the user chose "use offline" on the welcome screen — the app
+  /// works fully, social features just show a sign-in prompt.
+  static final ValueNotifier<bool> localMode = ValueNotifier<bool>(false);
+
   static Future<void> load() async {
     final p = await SharedPreferences.getInstance();
     defaultVisibility.value = p.getString(_visKey) ?? 'friends';
     categoriesViewable.value = p.getBool(_catViewKey) ?? true;
+    localMode.value = p.getBool(_localModeKey) ?? false;
+  }
+
+  static Future<void> setLocalMode(bool b) async {
+    localMode.value = b;
+    final p = await SharedPreferences.getInstance();
+    await p.setBool(_localModeKey, b);
   }
 
   static Future<void> setVisibility(String v) async {

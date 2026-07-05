@@ -8,7 +8,9 @@ import 'data/category_store.dart';
 import 'data/firebase_services.dart';
 import 'data/folder_store.dart';
 import 'firebase_options.dart';
+import 'models/user_profile.dart';
 import 'screens/main_scaffold.dart';
+import 'screens/welcome_screen.dart';
 import 'theme/app_theme.dart';
 import 'theme/theme_controller.dart';
 
@@ -43,12 +45,28 @@ class RestaurantTrackerApp extends StatelessWidget {
       valueListenable: ThemeController.mode,
       builder: (context, mode, _) {
         return MaterialApp(
-          title: 'Restaurant Tracker',
+          title: 'YUMS',
           debugShowCheckedModeBanner: false,
           theme: AppTheme.light,
           darkTheme: AppTheme.dark,
           themeMode: mode,
-          home: const MainScaffold(),
+          home: ValueListenableBuilder<UserProfile?>(
+            valueListenable: AuthService.user,
+            builder: (context, user, _) {
+              return ValueListenableBuilder<bool>(
+                valueListenable: AppPrefs.localMode,
+                builder: (context, localMode, _) {
+                  final inApp = user != null || localMode;
+                  return AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 350),
+                    child: inApp
+                        ? const MainScaffold()
+                        : const WelcomeScreen(),
+                  );
+                },
+              );
+            },
+          ),
         );
       },
     );

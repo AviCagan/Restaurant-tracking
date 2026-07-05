@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
 import '../models/user_profile.dart';
+import 'app_prefs.dart';
 
 /// Local mock auth for the Phase 2 preview. Phase 2 proper will replace this
 /// with Firebase Auth (Google sign-in) while keeping the same surface.
@@ -55,5 +56,7 @@ class AuthService {
   static Future<void> signOut() async {
     user.value = null;
     await _save();
+    // Return to the welcome screen rather than a signed-out shell.
+    await AppPrefs.setLocalMode(false);
   }
 }

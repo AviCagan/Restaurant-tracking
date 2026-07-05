@@ -4,7 +4,9 @@ import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb;
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
+import '../config.dart';
 import '../models/category.dart';
 import '../models/restaurant.dart';
 import '../models/user_profile.dart';
@@ -37,12 +39,25 @@ class CloudBoot {
 class FirebaseAuthService {
   static FirebaseFirestore get _db => FirebaseFirestore.instance;
 
-  /// Native Google sign-in (no extra client-id plumbing needed).
+  /// Google sign-in. Prefers the native account-picker flow (reliable, no
+  /// browser); falls back to the browser redirect flow if no web client id
+  /// is configured.
   static Future<UserProfile?> signInWithGoogle() async {
-    final provider = fb.GoogleAuthProvider();
-    final cred =
-        await fb.FirebaseAuth.instance.signInWithProvider(provider);
-    final user = cred.user;
+    fb.User? user;
+    if (AppConfig.googleWebClientId.isNotEmpty) {
+      final googleUser = await GoogleSignIn(
+              serverClientId: AppConfig.googleWebClientId)
+          .signIn();
+      if (googleUser == null) return null; // user cancelled
+      final auth = await googleUser.authentication;
+      final cred = fb.GoogleAuthProvider.credential(
+          accessToken: auth.accessToken, idToken: auth.idToken);
+      user = (await fb.FirebaseAuth.instance.signInWithCredential(cred)).user;
+    } else {
+      final cred = await fb.FirebaseAuth.instance
+          .signInWithProvider(fb.GoogleAuthProvider());
+      user = cred.user;
+    }
     if (user == null) return null;
     return loadProfile(user);
   }
@@ -123,6 +138,9 @@ class FirebaseAuthService {
   }
 
   static Future<void> signOut() async {
+    try {
+      await GoogleSignIn().signOut();
+    } catch (_) {}
     await fb.FirebaseAuth.instance.signOut();
     await AuthService.signOut();
     SocialService.resetToDemo();
