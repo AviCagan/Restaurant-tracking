@@ -27,6 +27,10 @@ class AppPrefs {
     localMode.value = p.getBool(_localModeKey) ?? false;
     hapticStrength.value = p.getInt(_hapticsKey) ?? 3;
     tourSeen.value = p.getBool(_tourKey) ?? false;
+    notifArrival.value = p.getBool(_notifArrivalKey) ?? true;
+    notifFriends.value = p.getBool(_notifFriendsKey) ?? true;
+    notifFriendsFilter.value = p.getString(_notifFilterKey) ?? '';
+    wrappedLastShown.value = p.getString(_wrappedKey) ?? '';
   }
 
   static Future<void> setLocalMode(bool b) async {
@@ -54,6 +58,50 @@ class AppPrefs {
     tourSeen.value = b;
     final p = await SharedPreferences.getInstance();
     await p.setBool(_tourKey, b);
+  }
+
+  // ---- Notifications ----
+  static const _notifArrivalKey = 'notif_arrival';
+  static const _notifFriendsKey = 'notif_friends';
+  static const _notifFilterKey = 'notif_friends_filter';
+  static const _wrappedKey = 'wrapped_last_shown';
+
+  /// Nudge to rate when the phone notices you're at a tracked restaurant.
+  static final ValueNotifier<bool> notifArrival = ValueNotifier<bool>(true);
+
+  /// Notify when friends share new ratings.
+  static final ValueNotifier<bool> notifFriends = ValueNotifier<bool>(true);
+
+  /// JSON: {"mode":"all"|"groups"|"friends","ids":[...]} — empty = everyone.
+  static final ValueNotifier<String> notifFriendsFilter =
+      ValueNotifier<String>('');
+
+  /// 'yyyy-MM' of the last month whose Wrapped was shown.
+  static final ValueNotifier<String> wrappedLastShown =
+      ValueNotifier<String>('');
+
+  static Future<void> setNotifArrival(bool b) async {
+    notifArrival.value = b;
+    final p = await SharedPreferences.getInstance();
+    await p.setBool(_notifArrivalKey, b);
+  }
+
+  static Future<void> setNotifFriends(bool b) async {
+    notifFriends.value = b;
+    final p = await SharedPreferences.getInstance();
+    await p.setBool(_notifFriendsKey, b);
+  }
+
+  static Future<void> setNotifFriendsFilter(String json) async {
+    notifFriendsFilter.value = json;
+    final p = await SharedPreferences.getInstance();
+    await p.setString(_notifFilterKey, json);
+  }
+
+  static Future<void> setWrappedLastShown(String yyyyMm) async {
+    wrappedLastShown.value = yyyyMm;
+    final p = await SharedPreferences.getInstance();
+    await p.setString(_wrappedKey, yyyyMm);
   }
 
   static Future<void> setVisibility(String v) async {

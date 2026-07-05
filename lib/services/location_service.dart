@@ -25,6 +25,15 @@ class LocationService {
     }
   }
 
+  /// Instant last-known position (may be null on fresh devices).
+  static Future<Position?> lastKnown() async {
+    try {
+      return await Geolocator.getLastKnownPosition();
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Distance in meters between two points.
   static double distanceMeters(
       double lat1, double lng1, double lat2, double lng2) {

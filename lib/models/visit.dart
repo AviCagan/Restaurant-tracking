@@ -16,6 +16,9 @@ class Visit {
   /// 'private' (only you) or 'friends' (visible to friends).
   final String visibility;
 
+  /// True when this was delivery/takeout — no atmosphere to rate.
+  final bool isTakeout;
+
   const Visit({
     required this.id,
     required this.date,
@@ -26,11 +29,14 @@ class Visit {
     this.items = const [],
     this.photoPaths = const [],
     this.visibility = 'friends',
+    this.isTakeout = false,
   });
 
   bool get isPrivate => visibility == 'private';
 
-  double get overall => (foodRating + atmosphereRating) / 2.0;
+  /// A takeout visit's score is food only; dine-in averages food+atmosphere.
+  double get overall =>
+      isTakeout ? foodRating.toDouble() : (foodRating + atmosphereRating) / 2.0;
 
   Visit copyWith({
     DateTime? date,
@@ -41,6 +47,7 @@ class Visit {
     List<Item>? items,
     List<String>? photoPaths,
     String? visibility,
+    bool? isTakeout,
   }) =>
       Visit(
         id: id,
@@ -52,6 +59,7 @@ class Visit {
         items: items ?? this.items,
         photoPaths: photoPaths ?? this.photoPaths,
         visibility: visibility ?? this.visibility,
+        isTakeout: isTakeout ?? this.isTakeout,
       );
 
   Map<String, dynamic> toJson() => {
@@ -64,6 +72,7 @@ class Visit {
         'items': items.map((e) => e.toJson()).toList(),
         'photoPaths': photoPaths,
         'visibility': visibility,
+        'takeout': isTakeout,
       };
 
   factory Visit.fromJson(Map<String, dynamic> j) => Visit(
@@ -81,5 +90,6 @@ class Visit {
             .map((e) => e.toString())
             .toList(),
         visibility: j['visibility'] as String? ?? 'friends',
+        isTakeout: j['takeout'] as bool? ?? false,
       );
 }

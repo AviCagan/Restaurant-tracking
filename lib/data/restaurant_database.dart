@@ -13,7 +13,7 @@ class RestaurantDatabase {
 
   static const _dbName = 'restaurants.db';
   static const _table = 'restaurants';
-  static const _version = 4;
+  static const _version = 5;
 
   Database? _db;
 
@@ -39,6 +39,7 @@ class RestaurantDatabase {
             categoryKeys TEXT,
             visits TEXT,
             isFavorite INTEGER,
+            wantToGo INTEGER,
             isChain INTEGER,
             chainName TEXT,
             locationLabel TEXT,
@@ -63,6 +64,9 @@ class RestaurantDatabase {
         if (oldVersion < 4) {
           await db
               .execute('ALTER TABLE $_table ADD COLUMN isFavorite INTEGER');
+        }
+        if (oldVersion < 5) {
+          await db.execute('ALTER TABLE $_table ADD COLUMN wantToGo INTEGER');
         }
       },
     );

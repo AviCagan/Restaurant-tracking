@@ -33,6 +33,11 @@ dependencies:
   # Location (for "sort by distance" + the food map)
   geolocator: ^12.0.0
 
+  # Notifications
+  flutter_local_notifications: ^19.0.0
+  timezone: ^0.10.0
+  flutter_timezone: ^4.0.0
+
   # Food map + in-app place view
   google_maps_flutter: ^2.9.0
   url_launcher: ^6.3.1

@@ -12,6 +12,7 @@ import '../models/restaurant.dart';
 import '../models/visit.dart';
 import '../theme/app_theme.dart';
 import '../widgets/feed_card.dart';
+import '../services/notification_service.dart';
 import '../widgets/folder_sheets.dart';
 import 'add_restaurant_screen.dart';
 import 'add_visit_screen.dart';
@@ -48,6 +49,55 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
         _r = updated;
         _changed = true;
       });
+    }
+  }
+
+  Future<void> _toggleWantToGo() async {
+    final updated = _r.copyWith(wantToGo: !_r.wantToGo);
+    await _db.upsert(updated);
+    if (mounted) {
+      setState(() {
+        _r = updated;
+        _changed = true;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(updated.wantToGo
+              ? 'Added to "Want to go" 🌟'
+              : 'Removed from "Want to go"')));
+    }
+  }
+
+  /// Pick a date & time -> schedule a "don't forget to rate" reminder.
+  Future<void> _planVisit() async {
+    final date = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+      helpText: 'When are you going?',
+    );
+    if (date == null || !mounted) return;
+    final time = await showTimePicker(
+      context: context,
+      initialTime: const TimeOfDay(hour: 19, minute: 0),
+    );
+    if (time == null || !mounted) return;
+    final when = DateTime(
+        date.year, date.month, date.day, time.hour, time.minute);
+    // Remind 90 minutes after the planned time — right after the meal.
+    final remindAt = when.add(const Duration(minutes: 90));
+    await NotificationService.scheduleAt(
+      remindAt.isAfter(DateTime.now())
+          ? remindAt
+          : DateTime.now().add(const Duration(minutes: 1)),
+      'How was ${_r.name}? 🍽️',
+      'Don\'t forget to rate your visit while it\'s fresh!',
+      _r.id.hashCode & 0x7fffffff,
+    );
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(
+              'Reminder set for ${DateFormat.MMMd().add_jm().format(remindAt)}')));
     }
   }
 
@@ -145,6 +195,19 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
                       _r.isFavorite ? Icons.favorite : Icons.favorite_border,
                       color: _r.isFavorite ? AppTheme.accent : null,
                     ),
+                  ),
+                  IconButton(
+                    onPressed: _toggleWantToGo,
+                    tooltip: 'Want to go',
+                    icon: Icon(
+                      _r.wantToGo ? Icons.bookmark : Icons.bookmark_border,
+                      color: _r.wantToGo ? AppTheme.honey : null,
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: _planVisit,
+                    tooltip: 'Plan a visit',
+                    icon: const Icon(Icons.alarm_add_outlined),
                   ),
                   IconButton(
                       onPressed: () =>
@@ -475,6 +538,20 @@ class _VisitCard extends StatelessWidget {
               const SizedBox(width: 8),
               Icon(visit.isPrivate ? Icons.lock_outline : Icons.group_outlined,
                   size: 13, color: colors.subtle),
+              if (visit.isTakeout) ...[
+                const SizedBox(width: 6),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppTheme.honey.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Text('🥡 Takeout',
+                      style: TextStyle(
+                          fontSize: 10, fontWeight: FontWeight.w800)),
+                ),
+              ],
               const Spacer(),
               _MiniStat(label: 'Food', value: '${visit.foodRating}'),
               _MiniStat(label: 'Atmos', value: '${visit.atmosphereRating}'),

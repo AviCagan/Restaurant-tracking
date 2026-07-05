@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -11,9 +12,11 @@ import '../config.dart';
 import '../models/category.dart';
 import '../models/restaurant.dart';
 import '../models/user_profile.dart';
+import '../services/notification_service.dart';
 import 'app_prefs.dart';
 import 'auth_service.dart';
 import 'category_store.dart';
+import 'friend_group_store.dart';
 import 'restaurant_database.dart';
 import 'social_service.dart';
 
@@ -252,6 +255,7 @@ class _CloudSocial {
     // Add listeners for new friends.
     for (final uid in _friendByUid.keys) {
       if (_restaurantSubs.containsKey(uid)) continue;
+      var firstSnapshot = true;
       _restaurantSubs[uid] = _db
           .collection('users').doc(uid).collection('restaurants')
           .where('visibility', isEqualTo: 'friends')
@@ -261,11 +265,55 @@ class _CloudSocial {
           for (final d in snap.docs)
             if (_tryParse(d.data()) case final r?) r
         ];
+        // Notify on newly shared ratings (not the initial load).
+        if (!firstSnapshot) {
+          final friend = _friendByUid[uid];
+          if (friend != null) _notifyNewRatings(friend, snap);
+        }
+        firstSnapshot = false;
         _rebuildCaches();
       }, onError: (_) {});
       _fetchCategories(uid);
     }
     _rebuildCaches();
+  }
+
+  static void _notifyNewRatings(
+      Friend friend, QuerySnapshot<Map<String, dynamic>> snap) {
+    // Which groups are selected in the notification filter?
+    final selectedGroups = <List<String>>[];
+    try {
+      final raw = AppPrefs.notifFriendsFilter.value;
+      if (raw.isNotEmpty) {
+        final decoded = jsonDecode(raw) as Map<String, dynamic>;
+        if (decoded['mode'] == 'groups') {
+          final ids =
+              (decoded['ids'] as List? ?? []).map((e) => e.toString());
+          for (final id in ids) {
+            final g = FriendGroupStore.byId(id);
+            if (g != null) selectedGroups.add(g.usernames);
+          }
+        }
+      }
+    } catch (_) {}
+    if (!NotificationService.friendPassesFilter(
+        friend.username, selectedGroups)) {
+      return;
+    }
+    for (final change in snap.docChanges) {
+      if (change.type != DocumentChangeType.added &&
+          change.type != DocumentChangeType.modified) {
+        continue;
+      }
+      final r = _tryParse(change.doc.data() ?? {});
+      if (r == null || r.visits.isEmpty) continue;
+      NotificationService.show(
+        '${friend.name} rated ${r.name} ⭐',
+        '${r.overallRating.toStringAsFixed(1)}/10 — check it out on YUMS!',
+        id: change.doc.id.hashCode & 0x7fffffff,
+      );
+      break; // don't spam on bulk syncs
+    }
   }
 
   static Restaurant? _tryParse(Map<String, dynamic> data) {
@@ -312,9 +360,9 @@ class _CloudSocial {
         if (sharedVisits.isEmpty) continue;
         sharedVisits.sort((a, b) => b.date.compareTo(a.date));
         final latest = sharedVisits.first;
-        final rating = sharedVisits.fold<double>(
-                0, (s, v) => s + (v.foodRating + v.atmosphereRating) / 2) /
-            sharedVisits.length;
+        final rating =
+            sharedVisits.fold<double>(0, (s, v) => s + v.overall) /
+                sharedVisits.length;
         final location = r.locationDescriptor ?? r.address;
 
         final item = FeedItem(

@@ -26,6 +26,9 @@ class Restaurant {
   /// Marked as a favorite (shown on your profile).
   final bool isFavorite;
 
+  /// On the "places I want to go" wishlist.
+  final bool wantToGo;
+
   // ---- Chain support ----
   /// Whether this is one location of a multi-location chain.
   final bool isChain;
@@ -57,6 +60,7 @@ class Restaurant {
     this.categoryKeys = const [],
     this.visits = const [],
     this.isFavorite = false,
+    this.wantToGo = false,
     this.isChain = false,
     this.chainName,
     this.locationLabel,
@@ -76,11 +80,21 @@ class Restaurant {
   }
 
   double get avgFood => _avg((v) => v.foodRating);
-  double get avgAtmosphere => _avg((v) => v.atmosphereRating);
   double get avgPrice => _avg((v) => v.price);
 
-  /// Overall = average of (food+atmosphere) across visits, 0..10.
-  double get overallRating => (avgFood + avgAtmosphere) / 2.0;
+  /// Atmosphere only counts dine-in visits (takeout has none).
+  double get avgAtmosphere {
+    final dineIn = visits.where((v) => !v.isTakeout).toList();
+    if (dineIn.isEmpty) return 0;
+    return dineIn.fold<int>(0, (s, v) => s + v.atmosphereRating) /
+        dineIn.length;
+  }
+
+  /// Overall = average of each visit's own score (takeout = food only).
+  double get overallRating {
+    if (visits.isEmpty) return 0;
+    return visits.fold<double>(0, (s, v) => s + v.overall) / visits.length;
+  }
 
   String? get coverImage =>
       (customPhotoPath != null && customPhotoPath!.isNotEmpty)
@@ -111,6 +125,7 @@ class Restaurant {
     List<String>? categoryKeys,
     List<Visit>? visits,
     bool? isFavorite,
+    bool? wantToGo,
     bool? isChain,
     String? chainName,
     String? locationLabel,
@@ -131,6 +146,7 @@ class Restaurant {
       categoryKeys: categoryKeys ?? this.categoryKeys,
       visits: visits ?? this.visits,
       isFavorite: isFavorite ?? this.isFavorite,
+      wantToGo: wantToGo ?? this.wantToGo,
       isChain: isChain ?? this.isChain,
       chainName: chainName ?? this.chainName,
       locationLabel: locationLabel ?? this.locationLabel,
@@ -154,6 +170,7 @@ class Restaurant {
         'categoryKeys': jsonEncode(categoryKeys),
         'visits': jsonEncode(visits.map((v) => v.toJson()).toList()),
         'isFavorite': isFavorite ? 1 : 0,
+        'wantToGo': wantToGo ? 1 : 0,
         'isChain': isChain ? 1 : 0,
         'chainName': chainName,
         'locationLabel': locationLabel,
@@ -193,6 +210,7 @@ class Restaurant {
       categoryKeys: decodeStrings(m['categoryKeys']),
       visits: decodeVisits(m['visits']),
       isFavorite: (m['isFavorite'] as num?)?.toInt() == 1,
+      wantToGo: (m['wantToGo'] as num?)?.toInt() == 1,
       isChain: (m['isChain'] as num?)?.toInt() == 1,
       chainName: m['chainName'] as String?,
       locationLabel: m['locationLabel'] as String?,

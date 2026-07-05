@@ -1,9 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../data/app_prefs.dart';
 import '../data/auth_service.dart';
 import '../models/user_profile.dart';
 import 'tour_screen.dart';
+import 'wrapped_screen.dart';
+import '../services/notification_service.dart';
 import '../theme/app_theme.dart';
 import 'home_screen.dart';
 import 'map_screen.dart';
@@ -26,15 +30,31 @@ class _MainScaffoldState extends State<MainScaffold> {
   int _index = 0;
   final _pageController = PageController();
 
+  Timer? _arrivalTimer;
+
   @override
   void initState() {
     super.initState();
-    // First time in the app: show the quick tour.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!AppPrefs.tourSeen.value && mounted) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      // First time in the app: show the quick tour.
+      if (!AppPrefs.tourSeen.value) {
         TourScreen.show(context);
+        return;
+      }
+      // On the 1st of the month: last month's Wrapped (once).
+      final now = DateTime.now();
+      final lastMonth = DateTime(now.year, now.month - 1, 1);
+      final tag = '${lastMonth.year}-${lastMonth.month}';
+      if (now.day == 1 && AppPrefs.wrappedLastShown.value != tag) {
+        await AppPrefs.setWrappedLastShown(tag);
+        if (mounted) WrappedScreen.show(context, lastMonth);
       }
     });
+    // Gentle arrival check while the app is open.
+    NotificationService.checkArrival();
+    _arrivalTimer = Timer.periodic(const Duration(minutes: 10),
+        (_) => NotificationService.checkArrival());
   }
 
   static const _titles = ['My Eats', 'Food Map', 'Friends'];
@@ -48,6 +68,7 @@ class _MainScaffoldState extends State<MainScaffold> {
 
   @override
   void dispose() {
+    _arrivalTimer?.cancel();
     _pageController.dispose();
     super.dispose();
   }

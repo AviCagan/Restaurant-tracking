@@ -68,10 +68,53 @@ class _MapScreenState extends State<MapScreen> {
   // Selected people to filter by (empty = everyone).
   final Set<String> _people = {};
 
+  // Resolved before the map is built so it opens right where you are —
+  // no flying across the city on load.
+  LatLng? _start;
+  bool _startResolved = false;
+
   @override
   void initState() {
     super.initState();
+    _resolveStart();
     _loadMine();
+  }
+
+  Future<void> _resolveStart() async {
+    // Last known position is instant when available.
+    final last = await LocationService.lastKnown();
+    if (last != null) {
+      _start = LatLng(last.latitude, last.longitude);
+    } else {
+      final pos = await LocationService.current();
+      if (pos != null) _start = LatLng(pos.latitude, pos.longitude);
+    }
+    if (mounted) setState(() => _startResolved = true);
+  }
+
+  /// Zoom/pan so every visible pin fits on screen.
+  Future<void> _fitToMarkers() async {
+    if (_controller == null || _markers.isEmpty) return;
+    if (_markers.length == 1) {
+      await _controller!.animateCamera(
+          CameraUpdate.newLatLngZoom(_markers.first.position, 14));
+      return;
+    }
+    var minLat = double.infinity, maxLat = -double.infinity;
+    var minLng = double.infinity, maxLng = -double.infinity;
+    for (final m in _markers) {
+      final p = m.position;
+      if (p.latitude < minLat) minLat = p.latitude;
+      if (p.latitude > maxLat) maxLat = p.latitude;
+      if (p.longitude < minLng) minLng = p.longitude;
+      if (p.longitude > maxLng) maxLng = p.longitude;
+    }
+    await _controller!.animateCamera(CameraUpdate.newLatLngBounds(
+      LatLngBounds(
+          southwest: LatLng(minLat, minLng),
+          northeast: LatLng(maxLat, maxLng)),
+      70,
+    ));
   }
 
   Future<void> _loadMine() async {
@@ -207,11 +250,16 @@ class _MapScreenState extends State<MapScreen> {
     if (mounted) setState(() => _markers = markers);
   }
 
-  Future<void> _recenter() async {
+  Future<void> _recenter({bool animate = true}) async {
     final pos = await LocationService.current();
     final target =
         pos == null ? _defaultCenter : LatLng(pos.latitude, pos.longitude);
-    await _controller?.animateCamera(CameraUpdate.newLatLngZoom(target, 13));
+    final update = CameraUpdate.newLatLngZoom(target, 13);
+    if (animate) {
+      await _controller?.animateCamera(update);
+    } else {
+      await _controller?.moveCamera(update);
+    }
     if (pos == null && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
           content: Text('Turn on location to see where you are.')));
@@ -229,7 +277,8 @@ class _MapScreenState extends State<MapScreen> {
     FilterState.categories
       ..clear()
       ..addAll(result.categories);
-    _buildMarkers();
+    await _buildMarkers();
+    _fitToMarkers();
   }
 
   void _openPeople() {
@@ -244,7 +293,7 @@ class _MapScreenState extends State<MapScreen> {
           void toggle(VoidCallback fn) {
             setSheet(fn);
             setState(() {});
-            _buildMarkers();
+            _buildMarkers().then((_) => _fitToMarkers());
           }
 
           final colors = context.colors;
@@ -496,14 +545,18 @@ class _MapScreenState extends State<MapScreen> {
     final colors = context.colors;
     final filterCount = FilterState.categories.length;
     final peopleActive = _people.isNotEmpty;
+    if (!_startResolved) {
+      return const Center(child: CircularProgressIndicator());
+    }
     return Stack(
       children: [
         GoogleMap(
           initialCameraPosition:
-              const CameraPosition(target: _defaultCenter, zoom: 12),
+              CameraPosition(target: _start ?? _defaultCenter, zoom: 13),
           onMapCreated: (c) {
             _controller = c;
-            _recenter();
+            // Only jump if we opened without a known position.
+            if (_start == null) _recenter(animate: false);
           },
           markers: _markers,
           myLocationEnabled: true,

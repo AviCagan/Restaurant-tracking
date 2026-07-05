@@ -34,17 +34,17 @@ class _TourPage {
 
 const _pages = [
   _TourPage('🍔', 'Rate in 30 seconds',
-      'Tap the peach + button, pick the restaurant (it finds the one closest '
-      'to you), then drag the bars for food & atmosphere. Every visit gets '
-      'its own rating — YUMS averages them for you.'),
+      'Click the + button, pick the restaurant (it finds the one closest '
+      'to you), then drag the scales to rate food and atmosphere. Every '
+      'visit gets its own rating — YUMS averages them for you.'),
   _TourPage('📁', 'Keep it organized',
       'Make folders like “Date nights” or “Pizza tour” and drop restaurants '
       'in. Filter by your categories, chains, price or distance — and add '
       'your own categories anytime.'),
   _TourPage('🗺️', 'The Food Map',
       'Every place your friends rated shows as a colored pin — green means '
-      'go. Tap a pin to see who liked it, read their takes, and open the '
-      'place in Google Maps to call or order.'),
+      'go. Tap a pin to see who liked it, read their takes, and open Google '
+      'Maps to call or place an order.'),
   _TourPage('👋', 'Pull up a chair',
       'Add friends by username and see what they\'re eating. Each review is '
       'Friends or Private — you choose every time, and Private never leaves '

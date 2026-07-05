@@ -88,7 +88,7 @@ class _SocialScreenState extends State<SocialScreen> {
               const SizedBox(height: 8),
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-                child: Text('Fresh bites',
+                child: Text('Friends',
                     style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w800,

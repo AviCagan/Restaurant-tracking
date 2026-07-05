@@ -35,6 +35,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Set<String> get _activeChains => FilterState.chains;
   String _query = '';
   String? _folderId; // selected folder filter (null = all)
+  bool _wantOnly = false; // "places I want to go" toggle
 
   double? _myLat;
   double? _myLng;
@@ -184,7 +185,12 @@ class _HomeScreenState extends State<HomeScreen> {
           r.address.toLowerCase().contains(q);
       final matchesFolder =
           folder == null || folder.restaurantIds.contains(r.id);
-      return matchesFilter && matchesChain && matchesQuery && matchesFolder;
+      final matchesWant = !_wantOnly || r.wantToGo;
+      return matchesFilter &&
+          matchesChain &&
+          matchesQuery &&
+          matchesFolder &&
+          matchesWant;
     }).toList();
 
     int byName(Restaurant a, Restaurant b) =>
@@ -277,7 +283,10 @@ class _HomeScreenState extends State<HomeScreen> {
             _FolderBar(
               selected: _folderId,
               onSelect: (id) => setState(() => _folderId = id),
+              wantOnly: _wantOnly,
+              onToggleWant: () => setState(() => _wantOnly = !_wantOnly),
             ),
+            const SizedBox(height: 8),
             if (_activeFilters.isNotEmpty || _activeChains.isNotEmpty)
               _ActiveFilters(
                 active: _activeFilters,
@@ -425,9 +434,16 @@ class _Staggered extends StatelessWidget {
 /// Horizontal folder chips: All + each folder. Tap to filter, long-press to
 /// edit/delete, "+" to create.
 class _FolderBar extends StatelessWidget {
-  const _FolderBar({required this.selected, required this.onSelect});
+  const _FolderBar({
+    required this.selected,
+    required this.onSelect,
+    required this.wantOnly,
+    required this.onToggleWant,
+  });
   final String? selected;
   final ValueChanged<String?> onSelect;
+  final bool wantOnly;
+  final VoidCallback onToggleWant;
 
   Future<void> _longPress(BuildContext context, Folder f) async {
     final action = await showModalBottomSheet<String>(
@@ -478,7 +494,13 @@ class _FolderBar extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             children: [
               _chip(context, label: 'All', emoji: '🍽️',
-                  on: selected == null, onTap: () => onSelect(null)),
+                  on: selected == null && !wantOnly,
+                  onTap: () {
+                    if (wantOnly) onToggleWant();
+                    onSelect(null);
+                  }),
+              _chip(context, label: 'Want to go', emoji: '🌟',
+                  on: wantOnly, onTap: onToggleWant),
               ...folders.map((f) => _chip(
                     context,
                     label: '${f.name} (${f.restaurantIds.length})',
@@ -611,10 +633,10 @@ class _ActiveFilters extends StatelessWidget {
   Widget build(BuildContext context) {
     final cats = CategoryStore.fromKeys(active.toList());
     return SizedBox(
-      height: 38,
+      height: 42,
       child: ListView(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
         children: [
           ...cats.map((c) => _RemovableChip(
                 icon: c.icon,

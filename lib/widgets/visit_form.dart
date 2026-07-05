@@ -52,6 +52,7 @@ class VisitFormState extends State<VisitForm> {
   int _food = 5;
   int _atmosphere = 5;
   int _priceTier = 2;
+  bool _isTakeout = false;
   final List<_ItemDraft> _items = [];
   final List<String> _photoPaths = [];
   bool _showDetails = false;
@@ -68,6 +69,7 @@ class VisitFormState extends State<VisitForm> {
       _food = v.foodRating;
       _atmosphere = v.atmosphereRating;
       _priceTier = PriceTier.clamp(v.price);
+      _isTakeout = v.isTakeout;
       _notesCtrl.text = v.notes;
       _photoPaths.addAll(v.photoPaths);
       for (final it in v.items) {
@@ -111,6 +113,7 @@ class VisitFormState extends State<VisitForm> {
       items: items,
       photoPaths: List.of(_photoPaths),
       visibility: _visibility,
+      isTakeout: _isTakeout,
     );
   }
 
@@ -158,17 +161,69 @@ class VisitFormState extends State<VisitForm> {
           value: _food,
           onChanged: (v) => setState(() => _food = v),
         ),
-        const SizedBox(height: 24),
-        TapRatingBar(
-          label: 'Atmosphere',
-          emoji: '✨',
-          value: _atmosphere,
-          onChanged: (v) => setState(() => _atmosphere = v),
+        const SizedBox(height: 18),
+        Row(
+          children: [
+            const Text('🥡', style: TextStyle(fontSize: 18)),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text('Delivery / takeout?',
+                  style: TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                      color: colors.ink)),
+            ),
+            Switch(
+              value: _isTakeout,
+              activeThumbColor: Colors.white,
+              activeTrackColor: AppTheme.accent,
+              onChanged: (v) {
+                Haptics.tick();
+                setState(() => _isTakeout = v);
+              },
+            ),
+          ],
         ),
-        Padding(
-          padding: const EdgeInsets.only(top: 4),
-          child: Text('Service, vibe, seating…',
-              style: TextStyle(fontSize: 11.5, color: colors.subtle)),
+        AnimatedSize(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOut,
+          alignment: Alignment.topCenter,
+          child: _isTakeout
+              ? Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.only(top: 4),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppTheme.honey.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Text(
+                    'No atmosphere for takeout — this visit scores on the '
+                    'food alone.',
+                    style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: colors.ink),
+                  ),
+                )
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 6),
+                    TapRatingBar(
+                      label: 'Atmosphere',
+                      emoji: '✨',
+                      value: _atmosphere,
+                      onChanged: (v) => setState(() => _atmosphere = v),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text('Service, vibe, seating…',
+                          style: TextStyle(
+                              fontSize: 11.5, color: colors.subtle)),
+                    ),
+                  ],
+                ),
         ),
         const SizedBox(height: 22),
         Row(
