@@ -99,19 +99,15 @@ class SocialService {
   /// Set by the cloud layer: sends a plan invite to a friend by username.
   static Future<void> Function(String username, Plan plan)? cloudSendInvite;
 
-  static final ValueNotifier<List<Friend>> friends = ValueNotifier([
-    const Friend('Maya Cohen', 'mayaeats'),
-    const Friend('Daniel Roth', 'danroth'),
-    const Friend('Sara Levi', 'saralevi'),
-  ]);
+  static final ValueNotifier<List<Friend>> friends =
+      ValueNotifier<List<Friend>>([]);
 
-  static final ValueNotifier<List<Friend>> requests = ValueNotifier([
-    const Friend('Avi Friedman', 'avif'),
-    const Friend('Noa Bar', 'noab'),
-  ]);
+  static final ValueNotifier<List<Friend>> requests =
+      ValueNotifier<List<Friend>>([]);
 
-  /// Called by the cloud layer on sign-out to restore the demo data.
-  static void resetToDemo() {
+  /// Called by the cloud layer on sign-out / account deletion: back to a
+  /// clean, empty local state.
+  static void resetLocal() {
     cloudMode = false;
     cloudFeed = [];
     cloudPlaces = [];
@@ -120,70 +116,21 @@ class SocialService {
     cloudReviews = {};
     cloudCategories = {};
     invites.value = [];
-    friends.value = [
-      const Friend('Maya Cohen', 'mayaeats'),
-      const Friend('Daniel Roth', 'danroth'),
-      const Friend('Sara Levi', 'saralevi'),
-    ];
-    requests.value = [
-      const Friend('Avi Friedman', 'avif'),
-      const Friend('Noa Bar', 'noab'),
-    ];
+    friends.value = [];
+    requests.value = [];
   }
 
   static List<FeedItem> feed() {
     if (cloudMode) {
       return [...cloudFeed]..sort((a, b) => b.when.compareTo(a.when));
     }
-    final now = DateTime.now();
-    return [
-      FeedItem(
-        friendName: 'Maya Cohen',
-        restaurantName: 'Taco Bell',
-        location: 'Richmond Ave, Staten Island',
-        rating: 6.5,
-        when: now.subtract(const Duration(hours: 3)),
-        note: 'Late night run — solid as always.',
-      ),
-      FeedItem(
-        friendName: 'Daniel Roth',
-        restaurantName: 'Holy Schnitzel',
-        location: 'Nome Ave',
-        rating: 8.0,
-        when: now.subtract(const Duration(days: 1)),
-        note: 'Best schnitzel on the island.',
-      ),
-      FeedItem(
-        friendName: 'Sara Levi',
-        restaurantName: 'KAIFENG',
-        location: 'Jewett Ave',
-        rating: 7.5,
-        when: now.subtract(const Duration(days: 2)),
-      ),
-      FeedItem(
-        friendName: 'Maya Cohen',
-        restaurantName: 'Dairy Palace',
-        location: 'Victory Blvd',
-        rating: 9.0,
-        when: now.subtract(const Duration(days: 3)),
-        note: 'Obsessed with the milkshakes.',
-      ),
-    ];
+    return const [];
   }
 
   /// A friend's favorite restaurants.
   static List<String> favoritesFor(String friendName) {
     if (cloudMode) return cloudFavorites[friendName] ?? const [];
-    switch (friendName) {
-      case 'Maya Cohen':
-        return ['Dairy Palace', 'Taco Bell', 'Holy Schnitzel'];
-      case 'Daniel Roth':
-        return ['Holy Schnitzel', 'KAIFENG'];
-      case 'Sara Levi':
-        return ['KAIFENG', 'Sweetgreen', 'Dairy Palace'];
-      default:
-        return const [];
-    }
+    return const [];
   }
 
   /// A friend's reviews shared with friends — newest first.
@@ -196,93 +143,24 @@ class SocialService {
       ..sort((a, b) => b.when.compareTo(a.when));
   }
 
-  static const _reviewSnippets = [
-    'Would 100% go back!',
-    'Pretty solid all around.',
-    'Not really my vibe.',
-    'Absolutely loved it.',
-    'Service was a little slow.',
-    'Great value for what you get.',
-    'Honestly a bit overrated.',
-    'So good, came back twice.',
-    'Cozy spot, great for groups.',
-    'Expected more, sadly.',
-  ];
-
-  /// Friends who have been to [restaurantName] (mock, deterministic from the
-  /// friends list so it stays stable per restaurant).
+  /// Friends who have been to [restaurantName].
   static List<FriendVisit> friendsAtRestaurant(String restaurantName) {
     if (cloudMode) {
       return cloudAt[restaurantName.trim().toLowerCase()] ?? const [];
     }
-    final out = <FriendVisit>[];
-    for (final f in friends.value) {
-      final h = '${f.username}|$restaurantName'.hashCode.abs();
-      if (h % 3 == 2) continue; // most friends went
-      final rating = (h % 10) + 1;
-      out.add(FriendVisit(
-        f,
-        rating.toDouble(),
-        _reviewSnippets[h % _reviewSnippets.length],
-      ));
-    }
-    // Always show at least one if we have friends, so the section isn't empty.
-    if (out.isEmpty && friends.value.isNotEmpty) {
-      final f = friends.value.first;
-      final h = '${f.username}|$restaurantName'.hashCode.abs();
-      out.add(FriendVisit(
-          f, ((h % 10) + 1).toDouble(), _reviewSnippets[h % _reviewSnippets.length]));
-    }
-    return out;
+    return const [];
   }
-
-  /// Categories your friends use — some named differently from yours, to
-  /// demo the compare/import flow. (Mock.)
-  static List<AppCategory> friendCategories() => const [
-        AppCategory(key: 'f_dairy', label: 'Dairy 🧀', iconIndex: 1),
-        AppCategory(key: 'f_meat', label: 'Fleishig 🍖', iconIndex: 2),
-        AppCategory(key: 'f_mex', label: 'Tex-Mex', iconIndex: 5),
-        AppCategory(key: 'f_chinese', label: 'Chinese', iconIndex: 6),
-        AppCategory(key: 'f_sushi', label: 'Sushi', iconIndex: 12),
-        AppCategory(key: 'f_cafe', label: 'Coffee & Cafe', iconIndex: 15),
-      ];
 
   /// A specific friend's categories.
   static List<AppCategory> categoriesFor(String friendName) {
     if (cloudMode) return cloudCategories[friendName] ?? const [];
-    final all = [...friendCategories()];
-    all.sort((a, b) => '${a.key}$friendName'
-        .hashCode
-        .compareTo('${b.key}$friendName'.hashCode));
-    return all.take(4).toList();
+    return const [];
   }
 
   /// Friend-rated places for the food map.
   static List<MapPlace> mapPlaces() {
     if (cloudMode) return cloudPlaces;
-    const data = [
-      ('Taco Bell', '2259 Richmond Ave', 40.5827, -74.1648, ['f_mex']),
-      ('KAIFENG', '951 Jewett Ave', 40.6193, -74.1206, ['f_chinese']),
-      ('Holy Schnitzel', '438 Nome Ave', 40.5469, -74.1735, ['f_meat']),
-      ('Dairy Palace', '2216 Victory Blvd', 40.6098, -74.1330, ['f_dairy']),
-      ('Sushi Nakazawa', '1080 Bay St', 40.6149, -74.0712, ['f_sushi']),
-      ('Joe & Pat\'s', '1758 Victory Blvd', 40.6147, -74.1099, ['f_dairy']),
-      ('Mason\'s Coffee', '76 Lincoln Ave', 40.5983, -74.0908, ['f_cafe']),
-      ('Beans & Leaves', '1115 Richmond Rd', 40.5806, -74.0967, ['f_cafe']),
-      ('El Patron', '345 New Dorp Ln', 40.5732, -74.1158, ['f_mex']),
-    ];
-    return [
-      for (final d in data)
-        MapPlace(
-          id: d.$1,
-          name: d.$1,
-          address: '${d.$2}, Staten Island, NY',
-          lat: d.$3,
-          lng: d.$4,
-          categoryKeys: List<String>.from(d.$5),
-          visits: friendsAtRestaurant(d.$1),
-        ),
-    ];
+    return const [];
   }
 
   static void addFriend(String username) {

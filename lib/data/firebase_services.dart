@@ -181,23 +181,68 @@ class FirebaseAuthService {
     } catch (_) {}
     await fb.FirebaseAuth.instance.signOut();
     await AuthService.signOut();
-    SocialService.resetToDemo();
+    SocialService.resetLocal();
   }
 
-  /// Permanently deletes the cloud account: frees the username, wipes the
-  /// user's Firestore data and uploaded photos, then deletes the Firebase
-  /// Auth user. Local data stays on this device. Returns an error message,
-  /// or null on success.
+  /// Permanently deletes the cloud account: re-verifies with Google, removes
+  /// you from every friend's list, frees the username, wipes the user's
+  /// Firestore data and uploaded photos, then deletes the Firebase Auth
+  /// user. Local data stays on this device. Returns an error message, or
+  /// null on success.
   static Future<String?> deleteAccount() async {
     final user = fb.FirebaseAuth.instance.currentUser;
     if (user == null) {
       // Local/demo account — nothing in the cloud to remove.
       await AuthService.signOut();
+      SocialService.resetLocal();
       return null;
     }
+
+    // Re-authenticate FIRST. Firebase refuses account deletion on a stale
+    // session (requires-recent-login); doing it up front means we can't end
+    // up wiping the data and then failing to remove the sign-in.
+    if (AppConfig.googleWebClientId.isNotEmpty) {
+      try {
+        final googleUser = await GoogleSignIn(
+                serverClientId: AppConfig.googleWebClientId)
+            .signIn();
+        if (googleUser == null) return 'Deletion cancelled.';
+        final auth = await googleUser.authentication;
+        await user.reauthenticateWithCredential(
+            fb.GoogleAuthProvider.credential(
+                accessToken: auth.accessToken, idToken: auth.idToken));
+      } catch (e) {
+        debugPrint('reauth for deletion failed: $e');
+        return 'Couldn\'t verify it\'s you — check your connection and '
+            'try again.';
+      }
+    }
+
     final uid = user.uid;
+
+    // Who are my friends? (Needed to remove myself from their lists.)
+    var friendUids = const <String>[];
+    try {
+      final snap =
+          await _db.collection('users').doc(uid).collection('friends').get();
+      friendUids = [for (final d in snap.docs) d.id];
+    } catch (_) {}
+
     _CloudSocial.stop();
     _CloudSync.stop();
+
+    // Unfriend everyone — delete my entry from each friend's list so I
+    // don't linger in their app after I'm gone.
+    for (var i = 0; i < friendUids.length; i += 400) {
+      try {
+        final batch = _db.batch();
+        for (final f in friendUids.skip(i).take(400)) {
+          batch.delete(
+              _db.collection('users').doc(f).collection('friends').doc(uid));
+        }
+        await batch.commit();
+      } catch (_) {}
+    }
 
     // Free the username reservation.
     final username = AuthService.user.value?.username;
@@ -243,23 +288,30 @@ class FirebaseAuthService {
       await _db.collection('users').doc(uid).delete();
     } catch (_) {}
 
+    // Remove the sign-in itself, then clear every trace locally so the app
+    // returns to the welcome screen and a fresh sign-in redoes setup.
+    String? error;
     try {
       await user.delete();
     } on fb.FirebaseAuthException catch (e) {
-      if (e.code == 'requires-recent-login') {
-        return 'For safety, sign out, sign back in, and try again.';
-      }
-      return e.message ?? 'Could not delete the account.';
+      error = e.code == 'requires-recent-login'
+          ? 'Your data was removed, but the sign-in needs a fresh login to '
+              'delete — sign in once more and delete again.'
+          : (e.message ?? 'Could not remove the sign-in.');
     } catch (e) {
-      return 'Could not delete the account: $e';
+      error = 'Could not remove the sign-in: $e';
     }
 
     try {
       await GoogleSignIn().signOut();
     } catch (_) {}
+    try {
+      await fb.FirebaseAuth.instance.signOut();
+    } catch (_) {}
+    CloudBoot.needsSetup.value = false;
     await AuthService.signOut();
-    SocialService.resetToDemo();
-    return null;
+    SocialService.resetLocal();
+    return error;
   }
 
   static bool get isCloudSignedIn =>
