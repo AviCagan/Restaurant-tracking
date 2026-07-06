@@ -99,8 +99,7 @@ class _FriendsManageScreenState extends State<FriendsManageScreen> {
                         margin: const EdgeInsets.only(bottom: 8),
                         decoration: AppTheme.panel(context, radius: 16),
                         child: ListTile(
-                          leading: Text(g.emoji,
-                              style: const TextStyle(fontSize: 24)),
+                          leading: GroupAvatar(group: g, size: 30),
                           title: Text(g.name,
                               style: const TextStyle(
                                   fontWeight: FontWeight.w700)),

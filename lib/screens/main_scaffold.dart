@@ -96,9 +96,9 @@ class _MainScaffoldState extends State<MainScaffold> {
           Container(
             width: double.infinity,
             padding: EdgeInsets.fromLTRB(16, topInset + 12, 16, 20),
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               gradient: AppTheme.accentGradient,
-              borderRadius: BorderRadius.vertical(bottom: Radius.circular(30)),
+              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(30)),
             ),
             child: Row(
               children: [

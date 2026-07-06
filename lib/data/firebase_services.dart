@@ -183,6 +183,84 @@ class FirebaseAuthService {
     SocialService.resetToDemo();
   }
 
+  /// Permanently deletes the cloud account: frees the username, wipes the
+  /// user's Firestore data and uploaded photos, then deletes the Firebase
+  /// Auth user. Local data stays on this device. Returns an error message,
+  /// or null on success.
+  static Future<String?> deleteAccount() async {
+    final user = fb.FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      // Local/demo account — nothing in the cloud to remove.
+      await AuthService.signOut();
+      return null;
+    }
+    final uid = user.uid;
+    _CloudSocial.stop();
+    _CloudSync.stop();
+
+    // Free the username reservation.
+    final username = AuthService.user.value?.username;
+    if (username != null && username.isNotEmpty) {
+      try {
+        await _db.collection('usernames').doc(username.toLowerCase()).delete();
+      } catch (_) {}
+    }
+
+    // Wipe subcollections (best effort — batches max out at 500 writes).
+    for (final sub in [
+      'restaurants',
+      'categories',
+      'friends',
+      'friendRequests',
+      'planInvites',
+    ]) {
+      try {
+        final snap =
+            await _db.collection('users').doc(uid).collection(sub).get();
+        for (var i = 0; i < snap.docs.length; i += 400) {
+          final batch = _db.batch();
+          for (final d in snap.docs.skip(i).take(400)) {
+            batch.delete(d.reference);
+          }
+          await batch.commit();
+        }
+      } catch (_) {}
+    }
+
+    // Uploaded photos.
+    try {
+      final list =
+          await FirebaseStorage.instance.ref('users/$uid/photos').listAll();
+      for (final item in list.items) {
+        try {
+          await item.delete();
+        } catch (_) {}
+      }
+    } catch (_) {}
+
+    try {
+      await _db.collection('users').doc(uid).delete();
+    } catch (_) {}
+
+    try {
+      await user.delete();
+    } on fb.FirebaseAuthException catch (e) {
+      if (e.code == 'requires-recent-login') {
+        return 'For safety, sign out, sign back in, and try again.';
+      }
+      return e.message ?? 'Could not delete the account.';
+    } catch (e) {
+      return 'Could not delete the account: $e';
+    }
+
+    try {
+      await GoogleSignIn().signOut();
+    } catch (_) {}
+    await AuthService.signOut();
+    SocialService.resetToDemo();
+    return null;
+  }
+
   static bool get isCloudSignedIn =>
       fb.FirebaseAuth.instance.currentUser != null;
 }

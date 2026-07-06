@@ -23,11 +23,15 @@ class PlacePrediction {
 
 /// Resolved details for a selected place.
 class PlaceDetails {
+  final String? placeId;
   final String name;
   final String address;
   final double? lat;
   final double? lng;
   final String? photoUrl;
+
+  /// All of the place's Google Maps photos (loadable URLs, first = cover).
+  final List<String> photoUrls;
 
   // Structured address parts (for chain location labels).
   final String? streetNumber;
@@ -35,11 +39,13 @@ class PlaceDetails {
   final String? city;
 
   PlaceDetails({
+    this.placeId,
     required this.name,
     required this.address,
     this.lat,
     this.lng,
     this.photoUrl,
+    this.photoUrls = const [],
     this.streetNumber,
     this.route,
     this.city,
@@ -154,12 +160,15 @@ class PlacesService {
     final body = jsonDecode(res.body) as Map<String, dynamic>;
     final location = body['location'] as Map<String, dynamic>?;
 
-    String? photoUrl;
+    final photoUrls = <String>[];
     final photos = body['photos'] as List?;
-    if (photos != null && photos.isNotEmpty) {
-      final name = (photos.first as Map<String, dynamic>)['name'] as String?;
-      if (name != null) photoUrl = photoUrlForName(name);
+    if (photos != null) {
+      for (final p in photos.take(10)) {
+        final name = (p as Map<String, dynamic>)['name'] as String?;
+        if (name != null) photoUrls.add(photoUrlForName(name));
+      }
     }
+    final photoUrl = photoUrls.isEmpty ? null : photoUrls.first;
 
     // Parse structured address components.
     final comps = body['addressComponents'] as List?;
@@ -186,6 +195,7 @@ class PlacesService {
         findComp('administrative_area_level_2');
 
     return PlaceDetails(
+      placeId: body['id'] as String? ?? placeId,
       name: (body['displayName']
               as Map<String, dynamic>?)?['text'] as String? ??
           '',
@@ -193,10 +203,30 @@ class PlacesService {
       lat: (location?['latitude'] as num?)?.toDouble(),
       lng: (location?['longitude'] as num?)?.toDouble(),
       photoUrl: photoUrl,
+      photoUrls: photoUrls,
       streetNumber: streetNumber,
       route: route,
       city: city,
     );
+  }
+
+  /// Fetch just the photo URLs for a place (for the cover-photo chooser when
+  /// the place was picked earlier and its photos weren't kept around).
+  Future<List<String>> photos(String placeId) async {
+    if (!enabled || placeId.isEmpty) return [];
+    final uri = Uri.parse('$_base/places/$placeId');
+    final res = await http.get(uri, headers: {
+      'X-Goog-Api-Key': _apiKey,
+      'X-Goog-FieldMask': 'photos',
+    });
+    if (res.statusCode != 200) return [];
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    final out = <String>[];
+    for (final p in (body['photos'] as List? ?? []).take(10)) {
+      final name = (p as Map<String, dynamic>)['name'] as String?;
+      if (name != null) out.add(photoUrlForName(name));
+    }
+    return out;
   }
 
   /// Build a directly-loadable Place Photo URL from a photo resource name

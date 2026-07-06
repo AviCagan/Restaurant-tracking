@@ -19,6 +19,9 @@ class Visit {
   /// True when this was delivery/takeout — no atmosphere to rate.
   final bool isTakeout;
 
+  /// Scores for user-defined custom rating bars (barId -> 1..10).
+  final Map<String, int> extraRatings;
+
   const Visit({
     required this.id,
     required this.date,
@@ -30,6 +33,7 @@ class Visit {
     this.photoPaths = const [],
     this.visibility = 'friends',
     this.isTakeout = false,
+    this.extraRatings = const {},
   });
 
   bool get isPrivate => visibility == 'private';
@@ -48,6 +52,7 @@ class Visit {
     List<String>? photoPaths,
     String? visibility,
     bool? isTakeout,
+    Map<String, int>? extraRatings,
   }) =>
       Visit(
         id: id,
@@ -60,6 +65,7 @@ class Visit {
         photoPaths: photoPaths ?? this.photoPaths,
         visibility: visibility ?? this.visibility,
         isTakeout: isTakeout ?? this.isTakeout,
+        extraRatings: extraRatings ?? this.extraRatings,
       );
 
   Map<String, dynamic> toJson() => {
@@ -73,6 +79,7 @@ class Visit {
         'photoPaths': photoPaths,
         'visibility': visibility,
         'takeout': isTakeout,
+        'extras': extraRatings,
       };
 
   factory Visit.fromJson(Map<String, dynamic> j) => Visit(
@@ -91,5 +98,7 @@ class Visit {
             .toList(),
         visibility: j['visibility'] as String? ?? 'friends',
         isTakeout: j['takeout'] as bool? ?? false,
+        extraRatings: (j['extras'] as Map? ?? {}).map(
+            (k, v) => MapEntry(k.toString(), (v as num).toInt())),
       );
 }

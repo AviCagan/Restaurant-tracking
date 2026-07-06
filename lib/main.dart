@@ -9,6 +9,7 @@ import 'data/firebase_services.dart';
 import 'data/folder_store.dart';
 import 'data/friend_group_store.dart';
 import 'data/plan_store.dart';
+import 'data/rating_bars_store.dart';
 import 'firebase_options.dart';
 import 'models/user_profile.dart';
 import 'screens/main_scaffold.dart';
@@ -23,6 +24,8 @@ Future<void> main() async {
   await CategoryStore.load();
   await CategoryMapping.load();
   await AppPrefs.load();
+  AppTheme.usePalette(AppPrefs.themeAccent.value);
+  await RatingBarsStore.load();
   await FolderStore.load();
   await FriendGroupStore.load();
   await PlanStore.load();
@@ -46,10 +49,14 @@ class RestaurantTrackerApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<ThemeMode>(
-      valueListenable: ThemeController.mode,
-      builder: (context, mode, _) {
-        return MaterialApp(
+    return ValueListenableBuilder<int>(
+      valueListenable: AppPrefs.themeAccent,
+      builder: (context, accentIdx, _) {
+        AppTheme.usePalette(accentIdx);
+        return ValueListenableBuilder<ThemeMode>(
+          valueListenable: ThemeController.mode,
+          builder: (context, mode, _) {
+            return MaterialApp(
           title: 'YUMS',
           debugShowCheckedModeBanner: false,
           theme: AppTheme.light,
@@ -81,7 +88,9 @@ class RestaurantTrackerApp extends StatelessWidget {
                 },
               );
             },
-          ),
+              ),
+            );
+          },
         );
       },
     );

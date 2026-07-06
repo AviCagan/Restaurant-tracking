@@ -31,6 +31,7 @@ class AppPrefs {
     notifFriends.value = p.getBool(_notifFriendsKey) ?? true;
     notifFriendsFilter.value = p.getString(_notifFilterKey) ?? '';
     wrappedLastShown.value = p.getString(_wrappedKey) ?? '';
+    themeAccent.value = p.getInt(_themeAccentKey) ?? 0;
   }
 
   static Future<void> setLocalMode(bool b) async {
@@ -96,6 +97,17 @@ class AppPrefs {
     notifFriendsFilter.value = json;
     final p = await SharedPreferences.getInstance();
     await p.setString(_notifFilterKey, json);
+  }
+
+  static const _themeAccentKey = 'theme_accent';
+
+  /// Index into kPalettes (Customize → Theme color).
+  static final ValueNotifier<int> themeAccent = ValueNotifier<int>(0);
+
+  static Future<void> setThemeAccent(int i) async {
+    themeAccent.value = i;
+    final p = await SharedPreferences.getInstance();
+    await p.setInt(_themeAccentKey, i);
   }
 
   static Future<void> setWrappedLastShown(String yyyyMm) async {

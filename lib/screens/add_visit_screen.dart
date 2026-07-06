@@ -62,7 +62,7 @@ class _AddVisitScreenState extends State<AddVisitScreen> {
                       width: 18,
                       height: 18,
                       child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Text('Save',
+                  : Text('Save',
                       style: TextStyle(
                           fontWeight: FontWeight.w800,
                           fontSize: 16,

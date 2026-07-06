@@ -7,11 +7,13 @@ import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 
 import '../data/app_prefs.dart';
+import '../data/rating_bars_store.dart';
 import '../models/item.dart';
 import '../models/price_tier.dart';
 import '../models/visit.dart';
 import '../services/media_storage.dart';
 import '../theme/app_theme.dart';
+import 'photo_source_sheet.dart';
 import 'rating_picker_sheet.dart';
 import 'tap_rating_bar.dart';
 import '../services/haptics.dart';
@@ -53,6 +55,7 @@ class VisitFormState extends State<VisitForm> {
   int _atmosphere = 5;
   int _priceTier = 2;
   bool _isTakeout = false;
+  final Map<String, int> _extras = {};
   final List<_ItemDraft> _items = [];
   final List<String> _photoPaths = [];
   bool _showDetails = false;
@@ -70,6 +73,7 @@ class VisitFormState extends State<VisitForm> {
       _atmosphere = v.atmosphereRating;
       _priceTier = PriceTier.clamp(v.price);
       _isTakeout = v.isTakeout;
+      _extras.addAll(v.extraRatings);
       _notesCtrl.text = v.notes;
       _photoPaths.addAll(v.photoPaths);
       for (final it in v.items) {
@@ -114,6 +118,12 @@ class VisitFormState extends State<VisitForm> {
       photoPaths: List.of(_photoPaths),
       visibility: _visibility,
       isTakeout: _isTakeout,
+      extraRatings: {
+        // Bars currently shown default to 5 even if never tapped, matching
+        // the built-in bars; values from deleted bars are kept as-is.
+        for (final b in RatingBarsStore.customBars) b.id: 5,
+        ..._extras,
+      },
     );
   }
 
@@ -138,8 +148,17 @@ class VisitFormState extends State<VisitForm> {
       );
       return;
     }
-    final imgs = await _picker.pickMultiImage(
-        maxWidth: 1600, imageQuality: 85, limit: remaining);
+    final source = await PhotoSourceSheet.show(context);
+    if (source == null) return;
+    final imgs = <XFile>[];
+    if (source == ImageSource.camera) {
+      final shot = await _picker.pickImage(
+          source: ImageSource.camera, maxWidth: 1600, imageQuality: 85);
+      if (shot != null) imgs.add(shot);
+    } else {
+      imgs.addAll(await _picker.pickMultiImage(
+          maxWidth: 1600, imageQuality: 85, limit: remaining));
+    }
     if (imgs.isEmpty) return;
     final persisted = <String>[];
     for (final img in imgs.take(remaining)) {
@@ -152,15 +171,39 @@ class VisitFormState extends State<VisitForm> {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+    return ValueListenableBuilder<List<BarDef>>(
+      valueListenable: RatingBarsStore.all,
+      builder: (context, bars, _) => _buildForm(colors, bars),
+    );
+  }
+
+  Widget _buildForm(AppColors colors, List<BarDef> bars) {
+    final foodDef = bars.firstWhere((b) => b.id == 'food',
+        orElse: () => const BarDef(
+            id: 'food', emoji: '🍔', title: 'Food', builtin: true));
+    final atmoDef = bars.firstWhere((b) => b.id == 'atmosphere',
+        orElse: () => const BarDef(
+            id: 'atmosphere',
+            emoji: '✨',
+            title: 'Atmosphere',
+            subtitle: 'Service, vibe, seating…',
+            builtin: true));
+    final customBars = bars.where((b) => !b.builtin).toList();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         TapRatingBar(
-          label: 'Food',
-          emoji: '🍔',
+          label: foodDef.title,
+          emoji: foodDef.emoji,
           value: _food,
           onChanged: (v) => setState(() => _food = v),
         ),
+        if (foodDef.subtitle.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(foodDef.subtitle,
+                style: TextStyle(fontSize: 11.5, color: colors.subtle)),
+          ),
         const SizedBox(height: 18),
         Row(
           children: [
@@ -211,20 +254,36 @@ class VisitFormState extends State<VisitForm> {
                   children: [
                     const SizedBox(height: 6),
                     TapRatingBar(
-                      label: 'Atmosphere',
-                      emoji: '✨',
+                      label: atmoDef.title,
+                      emoji: atmoDef.emoji,
                       value: _atmosphere,
                       onChanged: (v) => setState(() => _atmosphere = v),
                     ),
-                    Padding(
-                      padding: const EdgeInsets.only(top: 4),
-                      child: Text('Service, vibe, seating…',
-                          style: TextStyle(
-                              fontSize: 11.5, color: colors.subtle)),
-                    ),
+                    if (atmoDef.subtitle.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(atmoDef.subtitle,
+                            style: TextStyle(
+                                fontSize: 11.5, color: colors.subtle)),
+                      ),
                   ],
                 ),
         ),
+        for (final bar in customBars) ...[
+          const SizedBox(height: 18),
+          TapRatingBar(
+            label: bar.title,
+            emoji: bar.emoji,
+            value: _extras[bar.id] ?? 5,
+            onChanged: (v) => setState(() => _extras[bar.id] = v),
+          ),
+          if (bar.subtitle.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(bar.subtitle,
+                  style: TextStyle(fontSize: 11.5, color: colors.subtle)),
+            ),
+        ],
         const SizedBox(height: 22),
         Row(
           children: [

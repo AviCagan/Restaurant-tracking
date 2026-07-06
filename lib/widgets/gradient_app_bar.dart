@@ -24,7 +24,7 @@ class GradientAppBar extends StatelessWidget implements PreferredSizeWidget {
           style: AppTheme.heading(24, color: Colors.white)),
       actions: actions,
       flexibleSpace: Container(
-        decoration: const BoxDecoration(gradient: AppTheme.accentGradient),
+        decoration: BoxDecoration(gradient: AppTheme.accentGradient),
       ),
     );
   }

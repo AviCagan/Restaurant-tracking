@@ -44,7 +44,7 @@ class CategorySelector extends StatelessWidget {
               child: const Text('Cancel')),
           TextButton(
               onPressed: () => Navigator.pop(context, true),
-              child: const Text('Delete',
+              child: Text('Delete',
                   style: TextStyle(color: AppTheme.accent))),
         ],
       ),

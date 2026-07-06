@@ -69,7 +69,7 @@ class SortSheet extends StatelessWidget {
                       ),
                     ),
                     trailing: selected
-                        ? const Icon(Icons.check_rounded,
+                        ? Icon(Icons.check_rounded,
                             color: AppTheme.accent)
                         : null,
                   );

@@ -68,12 +68,36 @@ extension AppColorsX on BuildContext {
   AppColors get colors => Theme.of(this).extension<AppColors>()!;
 }
 
+/// A selectable accent palette.
+class ThemePalette {
+  final String name;
+  final Color accent;
+  final Color accentDark;
+  const ThemePalette(this.name, this.accent, this.accentDark);
+}
+
+const List<ThemePalette> kPalettes = [
+  ThemePalette('Peach', Color(0xFFF07A4B), Color(0xFFD65F31)),
+  ThemePalette('Berry', Color(0xFFE85D8A), Color(0xFFC94570)),
+  ThemePalette('Sage', Color(0xFF6FA57C), Color(0xFF54835F)),
+  ThemePalette('Ocean', Color(0xFF4C93C9), Color(0xFF3574A6)),
+  ThemePalette('Grape', Color(0xFF9B6BC7), Color(0xFF7E4FA8)),
+  ThemePalette('Sunny', Color(0xFFE8A21D), Color(0xFFC68608)),
+];
+
 /// Warm, friendly, cozy theme (light + dark).
 class AppTheme {
-  static const Color accent = Color(0xFFF07A4B); // sunset peach
-  static const Color accentDark = Color(0xFFD65F31);
+  // Mutable so the user can pick a palette in Customize. Set via [usePalette].
+  static Color accent = const Color(0xFFF07A4B);
+  static Color accentDark = const Color(0xFFD65F31);
   static const Color honey = Color(0xFFFFC24B);
   static const Color sage = Color(0xFF8FBA96);
+
+  static void usePalette(int index) {
+    final p = kPalettes[index.clamp(0, kPalettes.length - 1)];
+    accent = p.accent;
+    accentDark = p.accentDark;
+  }
 
   /// Chubby rounded display font for headings & big numbers.
   static TextStyle heading(double size,
@@ -81,11 +105,11 @@ class AppTheme {
       GoogleFonts.baloo2(
           fontSize: size, fontWeight: weight, color: color, height: 1.15);
 
-  static const Gradient accentGradient = LinearGradient(
-    colors: [Color(0xFFFFA26C), accent],
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-  );
+  static Gradient get accentGradient => LinearGradient(
+        colors: [Color.lerp(accent, Colors.white, 0.30)!, accent],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      );
 
   static ThemeData get light => _build(Brightness.light, AppColors.light);
   static ThemeData get dark => _build(Brightness.dark, AppColors.dark);
@@ -130,7 +154,7 @@ class AppTheme {
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       ),
-      floatingActionButtonTheme: const FloatingActionButtonThemeData(
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
         backgroundColor: accent,
         foregroundColor: Colors.white,
         elevation: 4,
@@ -151,7 +175,7 @@ class AppTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(18),
-          borderSide: const BorderSide(color: accent, width: 1.6),
+          borderSide: BorderSide(color: accent, width: 1.6),
         ),
       ),
       chipTheme: base.chipTheme.copyWith(

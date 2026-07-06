@@ -39,7 +39,7 @@ class FriendProfileScreen extends StatelessWidget {
           Container(
             decoration: AppTheme.panel(context, radius: 16),
             child: ListTile(
-              leading: const Icon(Icons.category_outlined,
+              leading: Icon(Icons.category_outlined,
                   color: AppTheme.accent),
               title: const Text('Categories',
                   style: TextStyle(fontWeight: FontWeight.w700)),
@@ -56,11 +56,11 @@ class FriendProfileScreen extends StatelessWidget {
           const SizedBox(height: 24),
 
           if (favorites.isNotEmpty) ...[
-            const Row(
+            Row(
               children: [
                 Icon(Icons.favorite, size: 18, color: AppTheme.accent),
-                SizedBox(width: 8),
-                Text('Favorites',
+                const SizedBox(width: 8),
+                const Text('Favorites',
                     style:
                         TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
               ],

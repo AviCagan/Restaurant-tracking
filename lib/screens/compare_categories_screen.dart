@@ -38,7 +38,7 @@ class _CompareCategoriesScreenState extends State<CompareCategoriesScreen> {
           TextButton(
               onPressed: () => Navigator.pop(context, true),
               child: Text(action,
-                  style: const TextStyle(color: AppTheme.accent))),
+                  style: TextStyle(color: AppTheme.accent))),
         ],
       ),
     );

@@ -16,6 +16,7 @@ import '../services/location_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/category_filter_sheet.dart';
 import '../widgets/feed_card.dart';
+import '../widgets/group_sheets.dart';
 import 'compare_categories_screen.dart';
 
 /// One person's rating of a place.
@@ -340,8 +341,7 @@ class _MapScreenState extends State<MapScreen> {
                           selectedColor:
                               AppTheme.accent.withValues(alpha: 0.18),
                           checkmarkColor: AppTheme.accent,
-                          avatar: Text(g.emoji,
-                              style: const TextStyle(fontSize: 14)),
+                          avatar: GroupAvatar(group: g, size: 18),
                           label: Text(g.name),
                           onSelected: (_) => toggle(() {
                             _people.clear();

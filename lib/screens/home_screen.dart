@@ -90,7 +90,7 @@ class _HomeScreenState extends State<HomeScreen> {
               child: const Text('Cancel')),
           TextButton(
               onPressed: () => Navigator.pop(context, true),
-              child: const Text('Delete',
+              child: Text('Delete',
                   style: TextStyle(color: AppTheme.accent))),
         ],
       ),
@@ -521,7 +521,7 @@ class _FolderBar extends StatelessWidget {
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.create_new_folder_outlined,
+                      Icon(Icons.create_new_folder_outlined,
                           size: 17, color: AppTheme.accent),
                       const SizedBox(width: 6),
                       Text('New',
@@ -678,12 +678,12 @@ class _RemovableChip extends StatelessWidget {
               Icon(icon, size: 14, color: AppTheme.accent),
               const SizedBox(width: 6),
               Text(label,
-                  style: const TextStyle(
+                  style: TextStyle(
                       fontSize: 12.5,
                       fontWeight: FontWeight.w700,
                       color: AppTheme.accent)),
               const SizedBox(width: 4),
-              const Icon(Icons.close, size: 13, color: AppTheme.accent),
+              Icon(Icons.close, size: 13, color: AppTheme.accent),
             ],
           ),
         ),
@@ -701,7 +701,7 @@ class _AddButton extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           colors: [AppTheme.accent, AppTheme.accentDark],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,

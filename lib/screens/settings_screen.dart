@@ -7,10 +7,11 @@ import '../data/friend_group_store.dart';
 import '../data/social_service.dart';
 import '../data/auth_service.dart';
 import '../data/firebase_services.dart';
-import '../services/haptics.dart';
 import '../theme/app_theme.dart';
 import '../theme/theme_controller.dart';
 import '../widgets/gradient_app_bar.dart';
+import '../widgets/group_sheets.dart';
+import 'customize_screen.dart';
 import 'tour_screen.dart';
 import 'wrapped_screen.dart';
 
@@ -46,6 +47,27 @@ class SettingsScreen extends StatelessWidget {
                 ),
               );
             },
+          ),
+          const SizedBox(height: 24),
+          const _SectionLabel('Customize'),
+          Container(
+            decoration: BoxDecoration(
+              color: colors.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: colors.line),
+            ),
+            child: ListTile(
+              leading: Icon(Icons.palette_outlined, color: AppTheme.accent),
+              title: const Text('Make it yours',
+                  style: TextStyle(fontWeight: FontWeight.w700)),
+              subtitle: Text('Theme color, rating bars & haptics',
+                  style: TextStyle(color: colors.subtle, fontSize: 12)),
+              trailing: Icon(Icons.chevron_right, color: colors.subtle),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const CustomizeScreen()),
+              ),
+            ),
           ),
           const SizedBox(height: 24),
           const _SectionLabel('Privacy'),
@@ -131,60 +153,6 @@ class SettingsScreen extends StatelessWidget {
             },
           ),
           const SizedBox(height: 24),
-          const _SectionLabel('Haptics'),
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: colors.surface,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: colors.line),
-            ),
-            child: ValueListenableBuilder<int>(
-              valueListenable: AppPrefs.hapticStrength,
-              builder: (context, strength, _) {
-                const labels = ['None', 'Light', 'Medium', 'Strong'];
-                return Row(
-                  children: List.generate(4, (i) {
-                    final on = i == strength;
-                    return Expanded(
-                      child: Padding(
-                        padding: EdgeInsets.only(right: i < 3 ? 8 : 0),
-                        child: GestureDetector(
-                          onTap: () async {
-                            await AppPrefs.setHapticStrength(i);
-                            Haptics.step(); // feel the new strength
-                          },
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 120),
-                            padding:
-                                const EdgeInsets.symmetric(vertical: 12),
-                            decoration: BoxDecoration(
-                              color:
-                                  on ? AppTheme.accent : colors.background,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                  color:
-                                      on ? AppTheme.accent : colors.line),
-                            ),
-                            child: Center(
-                              child: Text(labels[i],
-                                  style: TextStyle(
-                                      fontSize: 12.5,
-                                      fontWeight: FontWeight.w800,
-                                      color: on
-                                          ? Colors.white
-                                          : colors.ink)),
-                            ),
-                          ),
-                        ),
-                      ),
-                    );
-                  }),
-                );
-              },
-            ),
-          ),
-          const SizedBox(height: 24),
           const _SectionLabel('Notifications'),
           Container(
             decoration: BoxDecoration(
@@ -254,7 +222,7 @@ class SettingsScreen extends StatelessWidget {
                 Divider(height: 1, color: colors.line),
                 ListTile(
                   leading:
-                      const Icon(Icons.tour_outlined, color: AppTheme.accent),
+                      Icon(Icons.tour_outlined, color: AppTheme.accent),
                   title: const Text('App tour'),
                   subtitle: Text('Replay the quick intro',
                       style: TextStyle(color: colors.subtle, fontSize: 12)),
@@ -365,8 +333,7 @@ class SettingsScreen extends StatelessWidget {
                           selectedColor:
                               AppTheme.accent.withValues(alpha: 0.18),
                           checkmarkColor: AppTheme.accent,
-                          avatar: Text(g.emoji,
-                              style: const TextStyle(fontSize: 14)),
+                          avatar: GroupAvatar(group: g, size: 18),
                           label: Text(g.name),
                           onSelected: (_) {
                             setSheet(
@@ -449,7 +416,7 @@ class SettingsScreen extends StatelessWidget {
     return ListTile(
       title: Text(label),
       trailing: selected
-          ? const Icon(Icons.check_circle, color: AppTheme.accent)
+          ? Icon(Icons.check_circle, color: AppTheme.accent)
           : const Icon(Icons.circle_outlined, color: Colors.grey),
       onTap: () => ThemeController.set(value),
     );

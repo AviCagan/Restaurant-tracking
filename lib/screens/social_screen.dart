@@ -239,11 +239,11 @@ class _GroupChips extends StatelessWidget {
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16),
             children: [
-              _chip(context, '👥', 'Everyone', selected == null,
-                  () => onSelect(null)),
+              _chip(context, const Text('👥', style: TextStyle(fontSize: 14)),
+                  'Everyone', selected == null, () => onSelect(null)),
               ...groups.map((g) => _chip(
                     context,
-                    g.emoji,
+                    GroupAvatar(group: g, size: 18),
                     g.name,
                     selected == g.id,
                     () => onSelect(selected == g.id ? null : g.id),
@@ -267,7 +267,7 @@ class _GroupChips extends StatelessWidget {
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.group_add_outlined,
+                      Icon(Icons.group_add_outlined,
                           size: 16, color: AppTheme.accent),
                       const SizedBox(width: 6),
                       Text('New group',
@@ -286,7 +286,7 @@ class _GroupChips extends StatelessWidget {
     );
   }
 
-  Widget _chip(BuildContext context, String emoji, String label, bool on,
+  Widget _chip(BuildContext context, Widget leading, String label, bool on,
       VoidCallback onTap,
       {VoidCallback? onLongPress}) {
     final colors = context.colors;
@@ -306,7 +306,7 @@ class _GroupChips extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Text(emoji, style: const TextStyle(fontSize: 14)),
+            leading,
             const SizedBox(width: 6),
             Text(label,
                 style: TextStyle(

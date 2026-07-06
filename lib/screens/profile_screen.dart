@@ -88,6 +88,82 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  /// Two-step account deletion: "are you sure?", then type CONFIRM
+  /// (case sensitive) to actually delete.
+  Future<void> _deleteAccount() async {
+    const danger = Color(0xFFE0484D);
+    final sure = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete your account?'),
+        content: const Text(
+            'This permanently removes your profile, username, friends, and '
+            'everything you\'ve shared. This can\'t be undone.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: danger),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Yes, delete'),
+          ),
+        ],
+      ),
+    );
+    if (sure != true || !mounted) return;
+
+    final ctrl = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialog) {
+          final matches = ctrl.text == 'CONFIRM';
+          return AlertDialog(
+            title: const Text('Last step'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Type CONFIRM (all caps) to delete your account.'),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: ctrl,
+                  autofocus: true,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  decoration: const InputDecoration(hintText: 'CONFIRM'),
+                  onChanged: (_) => setDialog(() {}),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                  onPressed: () => Navigator.pop(dialogContext, false),
+                  child: const Text('Cancel')),
+              FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: danger,
+                  disabledBackgroundColor: danger.withValues(alpha: 0.3),
+                ),
+                onPressed: matches
+                    ? () => Navigator.pop(dialogContext, true)
+                    : null,
+                child: const Text('Delete forever'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final error = await FirebaseAuthService.deleteAccount();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(error ?? 'Your account has been deleted. 👋')));
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
@@ -116,7 +192,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                       child: Center(
                         child: Text(user.initials,
-                            style: const TextStyle(
+                            style: TextStyle(
                                 color: AppTheme.accent,
                                 fontWeight: FontWeight.w900,
                                 fontSize: 30)),
@@ -148,11 +224,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
               const SizedBox(height: 24),
-              const Row(
+              Row(
                 children: [
                   Icon(Icons.favorite, size: 18, color: AppTheme.accent),
-                  SizedBox(width: 8),
-                  Text('Favorites',
+                  const SizedBox(width: 8),
+                  const Text('Favorites',
                       style:
                           TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
                 ],
@@ -198,6 +274,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ? FirebaseAuthService.signOut()
                     : AuthService.signOut(),
               ),
+              _Tile(
+                icon: Icons.delete_forever_outlined,
+                label: 'Delete account',
+                color: const Color(0xFFE0484D),
+                onTap: _deleteAccount,
+              ),
             ],
           );
         },
@@ -229,10 +311,14 @@ class _Stat extends StatelessWidget {
 
 class _Tile extends StatelessWidget {
   const _Tile(
-      {required this.icon, required this.label, required this.onTap});
+      {required this.icon,
+      required this.label,
+      required this.onTap,
+      this.color});
   final IconData icon;
   final String label;
   final VoidCallback onTap;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
@@ -241,9 +327,10 @@ class _Tile extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 10),
       decoration: AppTheme.panel(context, radius: 16),
       child: ListTile(
-        leading: Icon(icon, color: colors.ink),
+        leading: Icon(icon, color: color ?? colors.ink),
         title: Text(label,
-            style: const TextStyle(fontWeight: FontWeight.w600)),
+            style: TextStyle(
+                fontWeight: FontWeight.w600, color: color)),
         trailing: Icon(Icons.chevron_right, color: colors.subtle),
         onTap: onTap,
       ),

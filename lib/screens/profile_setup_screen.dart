@@ -50,9 +50,9 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           Container(
             width: double.infinity,
             padding: EdgeInsets.fromLTRB(24, topInset + 24, 24, 24),
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               gradient: AppTheme.accentGradient,
-              borderRadius: BorderRadius.vertical(bottom: Radius.circular(30)),
+              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(30)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
