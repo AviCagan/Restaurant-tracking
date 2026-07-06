@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 
 import '../data/app_prefs.dart';
 import '../data/auth_service.dart';
+import '../data/plan_store.dart';
+import '../data/social_service.dart';
 import '../models/user_profile.dart';
 import 'tour_screen.dart';
 import 'wrapped_screen.dart';
@@ -210,6 +212,58 @@ class _CircleButton extends StatelessWidget {
   }
 }
 
+/// Red count bubble over the Friends tab icon: pending friend requests plus
+/// plan invites waiting for you.
+class _SocialBadge extends StatelessWidget {
+  const _SocialBadge({required this.child});
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<List<Friend>>(
+      valueListenable: SocialService.requests,
+      builder: (context, requests, _) {
+        return ValueListenableBuilder<List<PlanInvite>>(
+          valueListenable: SocialService.invites,
+          builder: (context, invites, _) {
+            final count = requests.length + invites.length;
+            return Stack(
+              clipBehavior: Clip.none,
+              children: [
+                child,
+                if (count > 0)
+                  Positioned(
+                    right: -10,
+                    top: -7,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 5, vertical: 2),
+                      constraints: const BoxConstraints(minWidth: 18),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE0484D),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.white, width: 1.5),
+                      ),
+                      child: Text(
+                        count > 9 ? '9+' : '$count',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            height: 1.2,
+                            fontWeight: FontWeight.w800),
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
 class _PillNav extends StatelessWidget {
   const _PillNav(
       {required this.index, required this.items, required this.onSelect});
@@ -273,23 +327,26 @@ class _PillNav extends StatelessWidget {
                     Row(
                       children: List.generate(n, (i) {
                         final selected = i == index;
+                        Widget icon = AnimatedScale(
+                          duration: const Duration(milliseconds: 300),
+                          curve: Curves.easeOutBack,
+                          scale: selected ? 1.18 : 1.0,
+                          child: Icon(items[i].$1,
+                              size: 24,
+                              color: selected
+                                  ? Colors.white
+                                  : colors.subtle),
+                        );
+                        // Friend requests + plan invites badge on the
+                        // Friends tab.
+                        if (items[i].$2 == 'Friends') {
+                          icon = _SocialBadge(child: icon);
+                        }
                         return Expanded(
                           child: GestureDetector(
                             onTap: () => onSelect(i),
                             behavior: HitTestBehavior.opaque,
-                            child: Center(
-                              child: AnimatedScale(
-                                duration:
-                                    const Duration(milliseconds: 300),
-                                curve: Curves.easeOutBack,
-                                scale: selected ? 1.18 : 1.0,
-                                child: Icon(items[i].$1,
-                                    size: 24,
-                                    color: selected
-                                        ? Colors.white
-                                        : colors.subtle),
-                              ),
-                            ),
+                            child: Center(child: icon),
                           ),
                         );
                       }),

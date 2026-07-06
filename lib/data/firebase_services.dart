@@ -4,7 +4,7 @@ import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb;
-import 'package:flutter/foundation.dart' show ValueNotifier;
+import 'package:flutter/foundation.dart' show ValueNotifier, debugPrint;
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:intl/intl.dart';
@@ -16,6 +16,7 @@ import '../models/user_profile.dart';
 import '../services/notification_service.dart';
 import 'app_prefs.dart';
 import 'auth_service.dart';
+import 'category_mapping.dart';
 import 'category_store.dart';
 import 'friend_group_store.dart';
 import 'plan_store.dart';
@@ -344,6 +345,7 @@ class _CloudSocial {
       _syncRestaurantListeners();
     });
 
+    var requestsFirst = true;
     _requestsSub = _db
         .collection('users').doc(uid).collection('friendRequests')
         .snapshots()
@@ -353,7 +355,22 @@ class _CloudSocial {
           Friend(d.data()['name'] as String? ?? 'Someone',
               d.data()['username'] as String? ?? d.id)
       ];
-    });
+      // Pop a notification for requests that arrive while signed in (not
+      // for ones already waiting when the listener starts).
+      if (!requestsFirst) {
+        for (final change in snap.docChanges) {
+          if (change.type != DocumentChangeType.added) continue;
+          final data = change.doc.data() ?? {};
+          NotificationService.show(
+            'New friend request 👋',
+            '${data['name'] ?? 'Someone'} (@${data['username'] ?? '?'}) '
+                'wants to be friends on YUMS!',
+            id: change.doc.id.hashCode & 0x7fffffff,
+          );
+        }
+      }
+      requestsFirst = false;
+    }, onError: (e) => debugPrint('friend requests listen failed: $e'));
   }
 
   static void stop() {
@@ -397,7 +414,8 @@ class _CloudSocial {
         }
         firstSnapshot = false;
         _rebuildCaches();
-      }, onError: (_) {});
+      }, onError: (e) =>
+          debugPrint('friend restaurants listen failed ($uid): $e'));
       _fetchCategories(uid);
     }
     _rebuildCaches();
@@ -455,7 +473,7 @@ class _CloudSocial {
     try {
       final snap = await _db
           .collection('users').doc(uid).collection('categories').get();
-      SocialService.cloudCategories[friend.name] = [
+      final cats = [
         for (final d in snap.docs)
           AppCategory(
             key: d.data()['key'] as String? ?? d.id,
@@ -463,6 +481,10 @@ class _CloudSocial {
             iconIndex: (d.data()['iconIndex'] as num?)?.toInt() ?? 0,
           )
       ];
+      SocialService.cloudCategories[friend.name] = cats;
+      // Same category, same name? Link them automatically — no manual
+      // "your Chinese = my Chinese" step.
+      await CategoryMapping.autoLink(cats, CategoryStore.all.value);
     } catch (_) {
       // Friend keeps categories private — rules deny the read.
       SocialService.cloudCategories[friend.name] = const [];
@@ -669,21 +691,29 @@ class _CloudSync {
       map['visibility'] = r.visits.any((v) => v.visibility == 'friends')
           ? 'friends'
           : 'private';
-      // Upload the cover once so friends can see it.
+      // Upload the cover once so friends can see it. Strictly best-effort:
+      // if Storage isn't set up, the restaurant must still sync — a missing
+      // photo is cosmetic, a missing doc means friends see nothing at all.
       final cover = r.customPhotoPath;
       if (cover != null && cover.isNotEmpty && File(cover).existsSync()) {
-        final ref = _storage.ref('users/$uid/photos/${r.id}-cover.jpg');
         try {
-          await ref.getMetadata(); // already uploaded
-        } catch (_) {
-          await ref.putFile(File(cover));
+          final ref = _storage.ref('users/$uid/photos/${r.id}-cover.jpg');
+          try {
+            await ref.getMetadata(); // already uploaded
+          } catch (_) {
+            await ref.putFile(File(cover));
+          }
+          map['photoUrl'] = await ref.getDownloadURL();
+        } catch (e) {
+          debugPrint('cover upload skipped (${r.name}): $e');
         }
-        map['photoUrl'] = await ref.getDownloadURL();
       }
       map.remove('customPhotoPath'); // local path is meaningless to others
       await _db.collection('users').doc(uid)
           .collection('restaurants').doc(r.id).set(map);
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('restaurant push failed (${r.name}): $e');
+    }
   }
 
   static Future<void> _deleteRestaurant(String id) async {

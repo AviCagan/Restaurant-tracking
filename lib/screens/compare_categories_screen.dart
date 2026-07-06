@@ -25,6 +25,20 @@ class CompareCategoriesScreen extends StatefulWidget {
 }
 
 class _CompareCategoriesScreenState extends State<CompareCategoriesScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Link identically-named categories automatically before showing the
+    // list (the map listens, so the UI updates when links land).
+    final friends = widget.friend == null
+        ? SocialService.friends.value
+        : [widget.friend!];
+    for (final f in friends) {
+      CategoryMapping.autoLink(
+          SocialService.categoriesFor(f.name), CategoryStore.all.value);
+    }
+  }
+
   Future<bool> _confirm(String title, String body, String action) async {
     final ok = await showDialog<bool>(
       context: context,
