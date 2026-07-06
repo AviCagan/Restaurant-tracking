@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../data/app_prefs.dart';
 import '../theme/app_theme.dart';
 
 /// A bold gradient app bar that gives the app its colorful, friendly header.
@@ -15,9 +14,9 @@ class GradientAppBar extends StatelessWidget implements PreferredSizeWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Listen to the palette so the gradient recolors the moment it changes.
+    // Follow the accent animation so the gradient glides between palettes.
     return ValueListenableBuilder<int>(
-      valueListenable: AppPrefs.themeAccent,
+      valueListenable: AppTheme.accentTick,
       builder: (context, _, __) => AppBar(
         backgroundColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,

@@ -99,6 +99,29 @@ class AppTheme {
     accentDark = p.accentDark;
   }
 
+  /// Bumped on every tick of the accent transition animation. Widgets that
+  /// paint with [accent] outside the Theme (gradient headers etc.) listen to
+  /// this so they glide along with the color change.
+  static final ValueNotifier<int> accentTick = ValueNotifier<int>(0);
+
+  /// Blend two accents through hue space, so the transition slides along the
+  /// color wheel and stays vivid instead of graying out midway.
+  static Color lerpAccentColor(Color a, Color b, double t) {
+    final ha = HSVColor.fromColor(a);
+    final hb = HSVColor.fromColor(b);
+    var dh = hb.hue - ha.hue;
+    if (dh > 180) dh -= 360;
+    if (dh < -180) dh += 360;
+    var hue = (ha.hue + dh * t) % 360;
+    if (hue < 0) hue += 360;
+    return HSVColor.fromAHSV(
+      1,
+      hue,
+      ha.saturation + (hb.saturation - ha.saturation) * t,
+      ha.value + (hb.value - ha.value) * t,
+    ).toColor();
+  }
+
   /// Chubby rounded display font for headings & big numbers.
   static TextStyle heading(double size,
           {Color? color, FontWeight weight = FontWeight.w600}) =>

@@ -44,15 +44,59 @@ Future<void> main() async {
   runApp(const RestaurantTrackerApp());
 }
 
-class RestaurantTrackerApp extends StatelessWidget {
+class RestaurantTrackerApp extends StatefulWidget {
   const RestaurantTrackerApp({super.key});
+
+  @override
+  State<RestaurantTrackerApp> createState() => _RestaurantTrackerAppState();
+}
+
+class _RestaurantTrackerAppState extends State<RestaurantTrackerApp>
+    with SingleTickerProviderStateMixin {
+  /// Glides the accent from the old palette to the new one; every tick
+  /// updates [AppTheme.accent] and bumps [AppTheme.accentTick].
+  late final AnimationController _accentCtrl = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 550));
+  Color _fromAccent = AppTheme.accent;
+  Color _fromDark = AppTheme.accentDark;
+
+  @override
+  void initState() {
+    super.initState();
+    AppPrefs.themeAccent.addListener(_retargetAccent);
+    _accentCtrl.addListener(_stepAccent);
+  }
+
+  @override
+  void dispose() {
+    AppPrefs.themeAccent.removeListener(_retargetAccent);
+    _accentCtrl.dispose();
+    super.dispose();
+  }
+
+  void _retargetAccent() {
+    // Start from wherever the color currently is (even mid-animation).
+    _fromAccent = AppTheme.accent;
+    _fromDark = AppTheme.accentDark;
+    _accentCtrl.forward(from: 0);
+  }
+
+  void _stepAccent() {
+    final target = kPalettes[
+        AppPrefs.themeAccent.value.clamp(0, kPalettes.length - 1)];
+    final t = Curves.easeInOutCubic.transform(_accentCtrl.value);
+    AppTheme.accent =
+        AppTheme.lerpAccentColor(_fromAccent, target.accent, t);
+    AppTheme.accentDark =
+        AppTheme.lerpAccentColor(_fromDark, target.accentDark, t);
+    AppTheme.accentTick.value++;
+  }
 
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<int>(
-      valueListenable: AppPrefs.themeAccent,
-      builder: (context, accentIdx, _) {
-        AppTheme.usePalette(accentIdx);
+      valueListenable: AppTheme.accentTick,
+      builder: (context, _, __) {
         return ValueListenableBuilder<ThemeMode>(
           valueListenable: ThemeController.mode,
           builder: (context, mode, _) {
@@ -62,6 +106,8 @@ class RestaurantTrackerApp extends StatelessWidget {
           theme: AppTheme.light,
           darkTheme: AppTheme.dark,
           themeMode: mode,
+          // We animate the accent ourselves, frame by frame.
+          themeAnimationDuration: Duration.zero,
           home: ValueListenableBuilder<bool>(
             valueListenable: CloudBoot.needsSetup,
             builder: (context, needsSetup, _) {

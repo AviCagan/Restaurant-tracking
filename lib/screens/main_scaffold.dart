@@ -94,7 +94,7 @@ class _MainScaffoldState extends State<MainScaffold> {
       body: Column(
         children: [
           ValueListenableBuilder<int>(
-            valueListenable: AppPrefs.themeAccent,
+            valueListenable: AppTheme.accentTick,
             builder: (context, _, child) => Container(
               width: double.infinity,
               padding: EdgeInsets.fromLTRB(16, topInset + 12, 16, 20),
