@@ -90,6 +90,10 @@ class Restaurant {
         dineIn.length;
   }
 
+  /// On the wishlist and never visited — show a "want to go" marker
+  /// instead of a (meaningless) zero score.
+  bool get isWishlisted => wantToGo && visits.isEmpty;
+
   /// Overall = average of each visit's own score (takeout = food only).
   double get overallRating {
     if (visits.isEmpty) return 0;

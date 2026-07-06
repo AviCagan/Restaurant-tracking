@@ -43,12 +43,18 @@ class RestaurantCard extends StatelessWidget {
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    _Tag(
-                      icon: Icons.event_repeat_outlined,
-                      label: restaurant.visitCount == 1
-                          ? '1 visit'
-                          : '${restaurant.visitCount} visits',
-                    ),
+                    if (restaurant.isWishlisted)
+                      const _Tag(
+                        icon: Icons.bookmark_outline,
+                        label: 'Want to go',
+                      )
+                    else
+                      _Tag(
+                        icon: Icons.event_repeat_outlined,
+                        label: restaurant.visitCount == 1
+                            ? '1 visit'
+                            : '${restaurant.visitCount} visits',
+                      ),
                     if (restaurant.avgPrice > 0)
                       _Tag(
                         icon: Icons.payments_outlined,
@@ -153,11 +159,13 @@ class _Banner extends StatelessWidget {
               ],
             ),
           ),
-          // Score badge
+          // Score badge — or a "want to go" star for unvisited wishlist spots.
           Positioned(
             top: 12,
             right: 12,
-            child: _ScoreBadge(value: restaurant.overallRating),
+            child: restaurant.isWishlisted
+                ? const _WantToGoBadge()
+                : _ScoreBadge(value: restaurant.overallRating),
           ),
           // Favorite heart
           if (restaurant.isFavorite)
@@ -193,6 +201,38 @@ class _PlaceholderBanner extends StatelessWidget {
         ),
       ),
       child: Center(child: Text('🍽️', style: TextStyle(fontSize: 44))),
+    );
+  }
+}
+
+/// Round badge for places you haven't been to yet — no score to show.
+class _WantToGoBadge extends StatelessWidget {
+  const _WantToGoBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 50,
+      height: 50,
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFFFFD36B), AppTheme.honey],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white, width: 3),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.25),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: const Center(
+        child: Text('🌟', style: TextStyle(fontSize: 20)),
+      ),
     );
   }
 }

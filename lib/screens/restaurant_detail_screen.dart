@@ -320,8 +320,9 @@ class _SummaryCard extends StatelessWidget {
     final r = restaurant;
     final overall = r.overallRating;
     final t = (overall / 10).clamp(0.0, 1.0);
-    final heroColor =
-        Color.lerp(const Color(0xFFF5A623), const Color(0xFF34C759), t)!;
+    final heroColor = r.isWishlisted
+        ? AppTheme.honey
+        : Color.lerp(const Color(0xFFF5A623), const Color(0xFF34C759), t)!;
 
     return Container(
       padding: const EdgeInsets.all(18),
@@ -342,7 +343,9 @@ class _SummaryCard extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      r.visits.isEmpty ? '–' : _fmt(overall),
+                      r.isWishlisted
+                          ? '🌟'
+                          : (r.visits.isEmpty ? '–' : _fmt(overall)),
                       style: TextStyle(
                           fontSize: 32,
                           height: 1,
@@ -350,7 +353,8 @@ class _SummaryCard extends StatelessWidget {
                           color: heroColor),
                     ),
                     const SizedBox(height: 2),
-                    Text('Overall',
+                    Text(r.isWishlisted ? 'Want to go' : 'Overall',
+                        textAlign: TextAlign.center,
                         style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w700,

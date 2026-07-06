@@ -213,14 +213,20 @@ class CustomizeScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     SizedBox(
-                      width: 64,
+                      width: 86,
                       child: TextField(
                         controller: emojiCtrl,
                         textAlign: TextAlign.center,
-                        style: const TextStyle(fontSize: 26),
-                        decoration: const InputDecoration(hintText: '⭐'),
+                        style: const TextStyle(fontSize: 30, height: 1.3),
+                        decoration: const InputDecoration(
+                          hintText: '⭐',
+                          isDense: false,
+                          contentPadding: EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 14),
+                        ),
                       ),
                     ),
                     const SizedBox(width: 10),

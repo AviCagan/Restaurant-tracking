@@ -35,6 +35,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // rebuild when the theme (accent palette) changes
     return Scaffold(
       body: Container(
         decoration: BoxDecoration(gradient: AppTheme.accentGradient),

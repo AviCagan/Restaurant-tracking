@@ -93,12 +93,17 @@ class _MainScaffoldState extends State<MainScaffold> {
     return Scaffold(
       body: Column(
         children: [
-          Container(
-            width: double.infinity,
-            padding: EdgeInsets.fromLTRB(16, topInset + 12, 16, 20),
-            decoration: BoxDecoration(
-              gradient: AppTheme.accentGradient,
-              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(30)),
+          ValueListenableBuilder<int>(
+            valueListenable: AppPrefs.themeAccent,
+            builder: (context, _, child) => Container(
+              width: double.infinity,
+              padding: EdgeInsets.fromLTRB(16, topInset + 12, 16, 20),
+              decoration: BoxDecoration(
+                gradient: AppTheme.accentGradient,
+                borderRadius:
+                    const BorderRadius.vertical(bottom: Radius.circular(30)),
+              ),
+              child: child,
             ),
             child: Row(
               children: [
