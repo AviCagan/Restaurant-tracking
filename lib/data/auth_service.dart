@@ -2,7 +2,6 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:uuid/uuid.dart';
 
 import '../models/user_profile.dart';
 import 'app_prefs.dart';
@@ -32,16 +31,6 @@ class AuthService {
     } else {
       await prefs.setString(_key, jsonEncode(user.value!.toJson()));
     }
-  }
-
-  /// Demo sign-in (no real provider yet). Creates a local profile.
-  static Future<void> signInDemo() async {
-    user.value = UserProfile(
-      id: const Uuid().v4(),
-      name: 'You',
-      username: 'you',
-    );
-    await _save();
   }
 
   /// Set by the cloud layer to mirror profile edits to Firestore.

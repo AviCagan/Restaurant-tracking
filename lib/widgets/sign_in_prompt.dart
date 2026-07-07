@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../data/auth_service.dart';
 import '../data/firebase_services.dart';
 import '../theme/app_theme.dart';
 
@@ -73,17 +72,6 @@ class _SignInPromptState extends State<SignInPrompt> {
                     style: TextStyle(
                         fontSize: 16, fontWeight: FontWeight.w800)),
               ),
-            ),
-            const SizedBox(height: 10),
-            TextButton(
-              onPressed: _busy
-                  ? null
-                  : () async {
-                      await AuthService.signInDemo();
-                      widget.onSignedIn?.call();
-                    },
-              child: Text('Just exploring? Try the demo',
-                  style: TextStyle(color: colors.subtle, fontSize: 13)),
             ),
           ],
         ),

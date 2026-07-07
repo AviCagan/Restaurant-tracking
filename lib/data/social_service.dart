@@ -185,17 +185,16 @@ class SocialService {
     return const [];
   }
 
-  static void addFriend(String username) {
+  /// Sends a friend request. Returns a user-facing error message, or null
+  /// when the request went out.
+  static Future<String?> addFriend(String username) async {
     final clean = username.trim().replaceAll('@', '');
-    if (clean.isEmpty) return;
-    if (cloudMode) {
-      cloudAddFriend?.call(clean); // sends a friend request
-      return;
+    if (clean.isEmpty) return 'Type a username first.';
+    if (!cloudMode) {
+      return 'Sign in with Google to add friends.';
     }
-    friends.value = [
-      ...friends.value,
-      Friend(clean, clean.toLowerCase()),
-    ];
+    final sent = await cloudAddFriend?.call(clean) ?? false;
+    return sent ? null : 'No user found with that username.';
   }
 
   static void removeFriend(Friend f) {

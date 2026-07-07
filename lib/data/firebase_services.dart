@@ -36,18 +36,38 @@ class CloudBoot {
     _authSub?.cancel();
     _authSub = fb.FirebaseAuth.instance.authStateChanges().listen((user) async {
       if (user != null) {
-        final snap = await FirebaseFirestore.instance
-            .collection('users').doc(user.uid).get();
-        if (snap.exists && (snap.data()?.containsKey('username') ?? false)) {
-          await FirebaseAuthService.loadProfile(user);
-          startServices(user.uid);
-        } else {
-          needsSetup.value = true; // brand new — run the setup screen
+        // A failed profile read must NOT strand the app in a half-signed-in
+        // state with the cloud layer off — retry with backoff.
+        for (var attempt = 0; attempt < 3; attempt++) {
+          try {
+            final snap = await FirebaseFirestore.instance
+                .collection('users').doc(user.uid).get();
+            if (snap.exists &&
+                (snap.data()?.containsKey('username') ?? false)) {
+              await FirebaseAuthService.loadProfile(user);
+              startServices(user.uid);
+            } else {
+              needsSetup.value = true; // brand new — run the setup screen
+            }
+            return;
+          } catch (e) {
+            debugPrint('cloud boot attempt ${attempt + 1} failed: $e');
+            await Future.delayed(Duration(seconds: 2 << attempt));
+          }
         }
+        debugPrint('cloud boot gave up — check network and Firestore rules');
       } else {
         needsSetup.value = false;
         _CloudSocial.stop();
         _CloudSync.stop();
+        // Firebase says signed out. If a profile is still cached locally
+        // (e.g. the account was deleted or the session was revoked), clear
+        // it — otherwise the app looks signed in while every social
+        // feature silently runs in offline mode.
+        if (AuthService.user.value != null && !AppPrefs.localMode.value) {
+          debugPrint('clearing stale local profile (no Firebase session)');
+          await AuthService.signOut();
+        }
       }
     });
   }

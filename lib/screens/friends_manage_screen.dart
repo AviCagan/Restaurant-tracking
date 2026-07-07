@@ -55,9 +55,16 @@ class _FriendsManageScreenState extends State<FriendsManageScreen> {
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14)),
                   ),
-                  onPressed: () {
-                    SocialService.addFriend(_addCtrl.text);
-                    _addCtrl.clear();
+                  onPressed: () async {
+                    final username = _addCtrl.text.trim().replaceAll('@', '');
+                    final error =
+                        await SocialService.addFriend(_addCtrl.text);
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                        content: Text(error ??
+                            'Request sent to @$username 💌 — they\'ll see '
+                                'it on their Friends tab.')));
+                    if (error == null) _addCtrl.clear();
                     setState(() {});
                   },
                   child: const Text('Add',

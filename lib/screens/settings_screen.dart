@@ -133,7 +133,13 @@ class SettingsScreen extends StatelessWidget {
                           try {
                             await FirebaseAuthService.signInWithGoogle();
                           } catch (_) {
-                            await AuthService.signInDemo();
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                      content: Text(
+                                          'Sign-in didn\'t work — check your '
+                                          'connection and try again.')));
+                            }
                           }
                         },
                       )
