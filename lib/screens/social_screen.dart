@@ -7,6 +7,7 @@ import '../data/friend_group_store.dart';
 import '../data/plan_store.dart';
 import '../data/social_service.dart';
 import '../models/user_profile.dart';
+import '../services/notification_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/feed_card.dart';
 import '../widgets/group_sheets.dart';
@@ -203,7 +204,8 @@ class _UpcomingPlans extends StatelessWidget {
                             fontWeight: FontWeight.w800, fontSize: 14)),
                     Text(
                         '${DateFormat.MMMEd().add_jm().format(p.when)}'
-                        '${p.friendUsernames.isEmpty ? '' : ' · ${p.friendUsernames.length} invited'}',
+                        '${p.friendUsernames.isEmpty ? '' : ' · ${p.friendUsernames.length} invited'}'
+                        '${p.isJoined ? ' · ${p.ownerName.split(' ').first}\'s plan' : ''}',
                         style:
                             TextStyle(fontSize: 12, color: colors.subtle)),
                   ],
@@ -231,7 +233,7 @@ class _UpcomingPlans extends StatelessWidget {
                 ),
               IconButton(
                 icon: Icon(Icons.close, size: 18, color: colors.subtle),
-                onPressed: () => PlanStore.delete(p.id),
+                onPressed: () => _removePlan(context, p),
               ),
             ],
           ),
@@ -247,6 +249,80 @@ class _UpcomingPlans extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  /// Removing a plan means different things: cancel it for everyone (my
+  /// plan with invitees), tell the owner I can't make it (a joined plan),
+  /// or just delete it (solo plan).
+  Future<void> _removePlan(BuildContext context, Plan p) async {
+    void cancelReminders() {
+      final baseId = p.id.hashCode & 0x7ffffff;
+      NotificationService.cancel(baseId);
+      NotificationService.cancel(baseId + 1);
+    }
+
+    if (p.isJoined) {
+      final out = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Can\'t make it anymore?'),
+          content: Text(
+              '${p.ownerName.split(' ').first} will be told you\'re out of '
+              'the ${p.restaurantName} plan.'),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('Keep plan')),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFFE0484D)),
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Can\'t make it'),
+            ),
+          ],
+        ),
+      );
+      if (out != true) return;
+      await SocialService.cloudSendReply?.call(p.ownerUid, p.id, false);
+      cancelReminders();
+      await PlanStore.delete(p.id);
+      return;
+    }
+
+    if (p.friendUsernames.isEmpty) {
+      cancelReminders();
+      await PlanStore.delete(p.id); // solo plan — nothing to broadcast
+      return;
+    }
+
+    final cancel = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Cancel this plan?'),
+        content: Text(
+            'Everyone invited to ${p.restaurantName} will see it\'s off '
+            'right away.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Keep plan')),
+          FilledButton(
+            style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFE0484D)),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Cancel for everyone'),
+          ),
+        ],
+      ),
+    );
+    if (cancel != true) return;
+    await SocialService.cloudCancelPlan?.call(p);
+    cancelReminders();
+    await PlanStore.delete(p.id);
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Plan cancelled — everyone\'s been told.')));
+    }
   }
 
   void _showDeclined(BuildContext context, Plan p) {

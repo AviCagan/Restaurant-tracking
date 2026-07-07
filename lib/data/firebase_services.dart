@@ -365,6 +365,8 @@ class _CloudSocial {
     SocialService.cloudDeclineRequest = _decline;
     SocialService.cloudSendInvite = _sendPlanInvite;
     SocialService.cloudRespondInvite = _respondInvite;
+    SocialService.cloudCancelPlan = _cancelPlan;
+    SocialService.cloudSendReply = _sendReply;
     SocialService.cloudRefreshCategories = _refreshAllCategories;
 
     var invitesFirst = true;
@@ -377,6 +379,29 @@ class _CloudSocial {
         final data = d.data();
         final when = DateTime.fromMillisecondsSinceEpoch(
             (data['when'] as num?)?.toInt() ?? 0);
+        // The sender cancelled the plan: pull it from my list (if I had
+        // joined), tell me, and consume the marker.
+        if (data['cancelled'] == true) {
+          final planId =
+              data['planId'] as String? ?? d.id.split('_').first;
+          final joined = PlanStore.byId(planId);
+          if (joined != null) {
+            PlanStore.delete(planId);
+            final baseId = planId.hashCode & 0x7ffffff;
+            NotificationService.cancel(baseId);
+            NotificationService.cancel(baseId + 1);
+            if (AppPrefs.notifPlans.value) {
+              NotificationService.show(
+                '${data['fromName'] ?? 'A friend'} cancelled the plan 😢',
+                '${data['restaurantName'] ?? 'The restaurant'} · '
+                    '${DateFormat.MMMEd().add_jm().format(when)} is off.',
+                id: d.id.hashCode & 0x7fffffff,
+              );
+            }
+          }
+          d.reference.delete().catchError((_) {});
+          continue;
+        }
         if (when.isBefore(
             DateTime.now().subtract(const Duration(days: 1)))) {
           continue; // stale
@@ -399,6 +424,7 @@ class _CloudSocial {
         for (final change in snap.docChanges) {
           if (change.type != DocumentChangeType.added) continue;
           final data = change.doc.data() ?? {};
+          if (data['cancelled'] == true) continue;
           final when = DateTime.fromMillisecondsSinceEpoch(
               (data['when'] as num?)?.toInt() ?? 0);
           NotificationService.show(
@@ -599,10 +625,11 @@ class _CloudSocial {
   static Future<void> _fetchCategories(String uid) async {
     final friend = _friendByUid[uid];
     if (friend == null) return;
+    var cats = <AppCategory>[];
     try {
       final snap = await _db
           .collection('users').doc(uid).collection('categories').get();
-      final cats = [
+      cats = [
         for (final d in snap.docs)
           AppCategory(
             key: d.data()['key'] as String? ?? d.id,
@@ -610,17 +637,33 @@ class _CloudSocial {
             iconIndex: (d.data()['iconIndex'] as num?)?.toInt() ?? 0,
           )
       ];
-      SocialService.cloudCategories[friend.name] = cats;
-      // Same category, same name? Link them automatically — no manual
-      // "your Chinese = my Chinese" step.
-      await CategoryMapping.autoLink(cats, CategoryStore.all.value);
-      debugPrint('categories for ${friend.name}: ${cats.length} fetched, '
-          '${CategoryMapping.map.value.length} total links');
     } catch (e) {
-      // Friend keeps categories private — rules deny the read.
-      debugPrint('categories fetch failed for ${friend.name}: $e');
-      SocialService.cloudCategories[friend.name] = const [];
+      debugPrint('categories subcollection read failed for '
+          '${friend.name}: $e');
     }
+    if (cats.isEmpty) {
+      // Fallback: the categories array mirrored onto the profile doc
+      // (works even when subcollection rules are stale).
+      try {
+        final doc = await _db.collection('users').doc(uid).get();
+        cats = [
+          for (final c in (doc.data()?['categories'] as List? ?? []))
+            AppCategory(
+              key: (c as Map)['key'] as String? ?? '',
+              label: c['label'] as String? ?? 'Category',
+              iconIndex: (c['iconIndex'] as num?)?.toInt() ?? 0,
+            )
+        ]..removeWhere((c) => c.key.isEmpty);
+      } catch (e) {
+        debugPrint('categories profile read failed for ${friend.name}: $e');
+      }
+    }
+    SocialService.cloudCategories[friend.name] = cats;
+    // Same category, same name? Link them automatically — no manual
+    // "your Chinese = my Chinese" step.
+    await CategoryMapping.autoLink(cats, CategoryStore.all.value);
+    debugPrint('categories for ${friend.name}: ${cats.length} fetched, '
+        '${CategoryMapping.map.value.length} total links');
   }
 
   static void _rebuildCaches() {
@@ -767,40 +810,81 @@ class _CloudSocial {
     } catch (_) {}
   }
 
+  /// RSVP straight to a plan owner's inbox (true = going).
+  static Future<void> _sendReply(
+      String ownerUid, String planId, bool going) async {
+    final uid = _uid;
+    final me = AuthService.user.value;
+    if (uid == null || me == null) return;
+    if (ownerUid.isEmpty || planId.isEmpty) return;
+    try {
+      await _db
+          .collection('users').doc(ownerUid)
+          .collection('planReplies').doc('${planId}_$uid')
+          .set({
+        'planId': planId,
+        'fromUid': uid,
+        'name': me.name,
+        'username': me.username,
+        'going': going,
+        'sentAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      debugPrint('plan reply failed: $e');
+    }
+  }
+
   /// RSVP to a plan invite: tell the sender, clear the invite, and (when
   /// going) keep the plan on my own list too.
   static Future<void> _respondInvite(PlanInvite invite, bool going) async {
     final uid = _uid;
-    final me = AuthService.user.value;
-    if (uid == null || me == null) return;
-    if (invite.fromUid.isNotEmpty && invite.planId.isNotEmpty) {
-      try {
-        await _db
-            .collection('users').doc(invite.fromUid)
-            .collection('planReplies').doc('${invite.planId}_$uid')
-            .set({
-          'planId': invite.planId,
-          'fromUid': uid,
-          'name': me.name,
-          'username': me.username,
-          'going': going,
-          'sentAt': FieldValue.serverTimestamp(),
-        });
-      } catch (e) {
-        debugPrint('plan reply failed: $e');
-      }
-    }
+    if (uid == null) return;
+    await _sendReply(invite.fromUid, invite.planId, going);
     try {
       await _db.collection('users').doc(uid)
           .collection('planInvites').doc(invite.id).delete();
     } catch (_) {}
     if (going && PlanStore.byId(invite.planId) == null) {
       await PlanStore.create(
+        id: invite.planId,
         restaurantId: '',
         restaurantName: invite.restaurantName,
         address: invite.address,
         when: invite.when,
+        ownerUid: invite.fromUid,
+        ownerName: invite.fromName,
       );
+    }
+  }
+
+  /// Cancel my plan for everyone: overwrite each invite with a cancelled
+  /// marker (accepted friends get it pulled from their list + notified;
+  /// pending invites disappear).
+  static Future<void> _cancelPlan(Plan plan) async {
+    final uid = _uid;
+    final me = AuthService.user.value;
+    if (uid == null || me == null) return;
+    for (final username in plan.friendUsernames) {
+      try {
+        final targetUid = await _uidForUsername(username);
+        if (targetUid == null) continue;
+        await _db
+            .collection('users').doc(targetUid)
+            .collection('planInvites').doc('${plan.id}_$uid')
+            .set({
+          'planId': plan.id,
+          'fromUid': uid,
+          'fromName': me.name,
+          'fromUsername': me.username,
+          'restaurantName': plan.restaurantName,
+          'address': plan.address,
+          'when': plan.when.millisecondsSinceEpoch,
+          'cancelled': true,
+          'sentAt': FieldValue.serverTimestamp(),
+        });
+      } catch (e) {
+        debugPrint('cancel push to $username failed: $e');
+      }
     }
   }
 
@@ -922,7 +1006,23 @@ class _CloudSync {
             {'key': c.key, 'label': c.label, 'iconIndex': c.iconIndex});
       }
       await batch.commit();
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('categories push failed: $e');
+    }
+    // Mirror onto the profile doc too — friends read this even when the
+    // subcollection rules in their project are out of date.
+    try {
+      await _db.collection('users').doc(uid).set({
+        'categories': AppPrefs.categoriesViewable.value
+            ? [
+                for (final c in CategoryStore.all.value)
+                  {'key': c.key, 'label': c.label, 'iconIndex': c.iconIndex}
+              ]
+            : [],
+      }, SetOptions(merge: true));
+    } catch (e) {
+      debugPrint('categories mirror failed: $e');
+    }
   }
 
   static Future<void> _pushPrefs() async {
@@ -934,5 +1034,7 @@ class _CloudSync {
         'defaultVisibility': AppPrefs.defaultVisibility.value,
       }, SetOptions(merge: true));
     } catch (_) {}
+    // The mirrored categories list follows the privacy toggle.
+    await _pushCategories();
   }
 }

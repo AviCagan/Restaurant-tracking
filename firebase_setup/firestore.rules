@@ -32,10 +32,13 @@ service cloud.firestore {
       }
 
       match /planInvites/{inviteId} {
-        // A friend drops a "let's eat here" invite in your inbox.
-        allow create: if signedIn() &&
+        // A friend drops a "let's eat here" invite in your inbox. The
+        // sender may update it (to mark the plan cancelled) or retract it.
+        allow create, update: if signedIn() &&
           request.resource.data.fromUid == request.auth.uid;
-        allow read, delete: if isMe(uid);
+        allow read: if isMe(uid);
+        allow delete: if isMe(uid) ||
+          (signedIn() && resource.data.fromUid == request.auth.uid);
       }
 
       match /planReplies/{replyId} {

@@ -70,6 +70,15 @@ class NotificationService {
     );
   }
 
+  /// Cancel a scheduled notification (e.g. plan reminders when the plan is
+  /// cancelled).
+  static Future<void> cancel(int id) async {
+    if (!_ready) return;
+    try {
+      await _plugin.cancel(id);
+    } catch (_) {}
+  }
+
   // ---- Arrival nudges (checked while the app is open) ----
 
   /// If you're within ~80m of a place you track and haven't been nudged for

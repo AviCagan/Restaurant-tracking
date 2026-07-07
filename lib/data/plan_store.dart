@@ -17,6 +17,11 @@ class Plan {
   final List<String> going;
   final List<String> declined;
 
+  /// Set when this plan was joined from a friend's invite: who owns it.
+  /// Empty for plans I made myself.
+  final String ownerUid;
+  final String ownerName;
+
   const Plan({
     required this.id,
     required this.restaurantId,
@@ -26,7 +31,12 @@ class Plan {
     this.friendUsernames = const [],
     this.going = const [],
     this.declined = const [],
+    this.ownerUid = '',
+    this.ownerName = '',
   });
+
+  /// True when this is a friend's plan I joined, not one I made.
+  bool get isJoined => ownerUid.isNotEmpty;
 
   Plan copyWith({List<String>? going, List<String>? declined}) => Plan(
         id: id,
@@ -37,6 +47,8 @@ class Plan {
         friendUsernames: friendUsernames,
         going: going ?? this.going,
         declined: declined ?? this.declined,
+        ownerUid: ownerUid,
+        ownerName: ownerName,
       );
 
   Map<String, dynamic> toJson() => {
@@ -48,6 +60,8 @@ class Plan {
         'friendUsernames': friendUsernames,
         'going': going,
         'declined': declined,
+        'ownerUid': ownerUid,
+        'ownerName': ownerName,
       };
 
   factory Plan.fromJson(Map<String, dynamic> j) => Plan(
@@ -63,6 +77,8 @@ class Plan {
             (j['going'] as List? ?? []).map((e) => e.toString()).toList(),
         declined:
             (j['declined'] as List? ?? []).map((e) => e.toString()).toList(),
+        ownerUid: j['ownerUid'] as String? ?? '',
+        ownerName: j['ownerName'] as String? ?? '',
       );
 }
 
@@ -114,19 +130,24 @@ class PlanStore {
   }
 
   static Future<Plan> create({
+    String? id,
     required String restaurantId,
     required String restaurantName,
     required String address,
     required DateTime when,
     List<String> friendUsernames = const [],
+    String ownerUid = '',
+    String ownerName = '',
   }) async {
     final plan = Plan(
-      id: const Uuid().v4(),
+      id: id ?? const Uuid().v4(),
       restaurantId: restaurantId,
       restaurantName: restaurantName,
       address: address,
       when: when,
       friendUsernames: friendUsernames,
+      ownerUid: ownerUid,
+      ownerName: ownerName,
     );
     all.value = [...all.value, plan]
       ..sort((a, b) => a.when.compareTo(b.when));
