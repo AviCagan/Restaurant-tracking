@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/social_service.dart';
+import '../models/price_tier.dart';
 import '../theme/app_theme.dart';
 
 /// Avatar circle showing a person's initials.
@@ -95,7 +96,9 @@ class FeedCard extends StatelessWidget {
                           style: const TextStyle(
                               fontWeight: FontWeight.w800, fontSize: 15)),
                     const SizedBox(height: 2),
-                    Text('${item.location} · ${ago(item.when)}',
+                    Text(
+                        '${item.location} · ${ago(item.when)}'
+                        '${item.price > 0 ? ' · ${PriceTier.signs(item.price)}' : ''}',
                         style: TextStyle(fontSize: 12, color: colors.subtle)),
                   ],
                 ),

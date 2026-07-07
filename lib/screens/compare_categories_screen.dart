@@ -37,6 +37,11 @@ class _CompareCategoriesScreenState extends State<CompareCategoriesScreen> {
       CategoryMapping.autoLink(
           SocialService.categoriesFor(f.name), CategoryStore.all.value);
     }
+    // And pull fresh copies from the cloud in case the cache is stale or
+    // was fetched before the friend synced; re-links when they land.
+    SocialService.cloudRefreshCategories?.call().then((_) {
+      if (mounted) setState(() {});
+    });
   }
 
   Future<bool> _confirm(String title, String body, String action) async {

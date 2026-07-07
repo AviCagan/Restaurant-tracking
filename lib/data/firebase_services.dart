@@ -325,9 +325,13 @@ class _CloudSocial {
   static StreamSubscription? _friendsSub;
   static StreamSubscription? _requestsSub;
   static StreamSubscription? _invitesSub;
+  static StreamSubscription? _repliesSub;
   static final Map<String, StreamSubscription> _restaurantSubs = {};
   static final Map<String, List<Restaurant>> _friendRestaurants = {};
   static final Map<String, Friend> _friendByUid = {};
+
+  /// Friend uids whose acceptance *I* triggered — don't notify myself.
+  static final Set<String> _selfAccepted = {};
 
   static void start(String uid) {
     stop();
@@ -340,6 +344,8 @@ class _CloudSocial {
     SocialService.cloudAcceptRequest = _accept;
     SocialService.cloudDeclineRequest = _decline;
     SocialService.cloudSendInvite = _sendPlanInvite;
+    SocialService.cloudRespondInvite = _respondInvite;
+    SocialService.cloudRefreshCategories = _refreshAllCategories;
 
     var invitesFirst = true;
     _invitesSub = _db
@@ -357,6 +363,10 @@ class _CloudSocial {
         }
         invites.add(PlanInvite(
           id: d.id,
+          // Older invites carry the plan id only in the doc id
+          // ('<planId>_<fromUid>').
+          planId: data['planId'] as String? ?? d.id.split('_').first,
+          fromUid: data['fromUid'] as String? ?? '',
           fromName: data['fromName'] as String? ?? 'A friend',
           restaurantName: data['restaurantName'] as String? ?? 'a restaurant',
           address: data['address'] as String? ?? '',
@@ -365,7 +375,7 @@ class _CloudSocial {
       }
       invites.sort((a, b) => a.when.compareTo(b.when));
       SocialService.invites.value = invites;
-      if (!invitesFirst) {
+      if (!invitesFirst && AppPrefs.notifPlans.value) {
         for (final change in snap.docChanges) {
           if (change.type != DocumentChangeType.added) continue;
           final data = change.doc.data() ?? {};
@@ -383,6 +393,35 @@ class _CloudSocial {
       invitesFirst = false;
     }, onError: (_) {});
 
+    // RSVPs to my plans land here; apply to the local plan and consume.
+    _repliesSub = _db
+        .collection('users').doc(uid).collection('planReplies')
+        .snapshots()
+        .listen((snap) async {
+      for (final change in snap.docChanges) {
+        if (change.type != DocumentChangeType.added) continue;
+        final data = change.doc.data() ?? {};
+        final planId = data['planId'] as String? ?? '';
+        final username = data['username'] as String? ?? '';
+        final name = data['name'] as String? ?? username;
+        final going = data['going'] as bool? ?? false;
+        final plan = PlanStore.byId(planId);
+        await PlanStore.applyReply(planId, username, going);
+        if (plan != null && AppPrefs.notifPlans.value) {
+          NotificationService.show(
+            going ? '$name is in! 🙌' : '$name can\'t make it 😢',
+            '${plan.restaurantName} · '
+                '${DateFormat.MMMEd().add_jm().format(plan.when)}',
+            id: change.doc.id.hashCode & 0x7fffffff,
+          );
+        }
+        try {
+          await change.doc.reference.delete();
+        } catch (_) {}
+      }
+    }, onError: (e) => debugPrint('plan replies listen failed: $e'));
+
+    var friendsFirst = true;
     _friendsSub = _db
         .collection('users').doc(uid).collection('friends')
         .snapshots()
@@ -394,6 +433,22 @@ class _CloudSocial {
             d.data()['username'] as String? ?? d.id);
       }
       SocialService.friends.value = _friendByUid.values.toList();
+      // A new doc here that *I* didn't create means someone accepted my
+      // friend request.
+      if (!friendsFirst) {
+        for (final change in snap.docChanges) {
+          if (change.type != DocumentChangeType.added) continue;
+          if (_selfAccepted.remove(change.doc.id)) continue;
+          if (!AppPrefs.notifSocial.value) continue;
+          final data = change.doc.data() ?? {};
+          NotificationService.show(
+            '${data['name'] ?? 'A friend'} accepted your request! 🎉',
+            'You\'re now friends on YUMS — check out their eats.',
+            id: change.doc.id.hashCode & 0x7fffffff,
+          );
+        }
+      }
+      friendsFirst = false;
       _syncRestaurantListeners();
     });
 
@@ -409,7 +464,7 @@ class _CloudSocial {
       ];
       // Pop a notification for requests that arrive while signed in (not
       // for ones already waiting when the listener starts).
-      if (!requestsFirst) {
+      if (!requestsFirst && AppPrefs.notifSocial.value) {
         for (final change in snap.docChanges) {
           if (change.type != DocumentChangeType.added) continue;
           final data = change.doc.data() ?? {};
@@ -429,12 +484,14 @@ class _CloudSocial {
     _friendsSub?.cancel();
     _requestsSub?.cancel();
     _invitesSub?.cancel();
+    _repliesSub?.cancel();
     for (final s in _restaurantSubs.values) {
       s.cancel();
     }
     _restaurantSubs.clear();
     _friendRestaurants.clear();
     _friendByUid.clear();
+    _selfAccepted.clear();
     _uid = null;
   }
 
@@ -537,8 +594,11 @@ class _CloudSocial {
       // Same category, same name? Link them automatically — no manual
       // "your Chinese = my Chinese" step.
       await CategoryMapping.autoLink(cats, CategoryStore.all.value);
-    } catch (_) {
+      debugPrint('categories for ${friend.name}: ${cats.length} fetched, '
+          '${CategoryMapping.map.value.length} total links');
+    } catch (e) {
       // Friend keeps categories private — rules deny the read.
+      debugPrint('categories fetch failed for ${friend.name}: $e');
       SocialService.cloudCategories[friend.name] = const [];
     }
   }
@@ -571,11 +631,13 @@ class _CloudSocial {
           rating: rating,
           when: latest.date,
           note: latest.notes,
+          price: latest.price,
         );
         feed.add(item);
         (reviews[friend.name] ??= []).add(item);
 
-        final visit = FriendVisit(friend, rating, latest.notes);
+        final visit =
+            FriendVisit(friend, rating, latest.notes, price: latest.price);
         (at[r.name.trim().toLowerCase()] ??= []).add(visit);
 
         if (r.isFavorite) (favorites[friend.name] ??= []).add(r.name);
@@ -637,6 +699,7 @@ class _CloudSocial {
     if (uid == null || me == null) return;
     final fromUid = await _uidForUsername(f.username);
     if (fromUid == null) return;
+    _selfAccepted.add(fromUid); // I accepted — don't notify myself
     final batch = _db.batch();
     batch.set(
         _db.collection('users').doc(uid).collection('friends').doc(fromUid),
@@ -672,6 +735,7 @@ class _CloudSocial {
           .collection('users').doc(targetUid)
           .collection('planInvites').doc('${plan.id}_$uid')
           .set({
+        'planId': plan.id,
         'fromUid': uid,
         'fromName': me.name,
         'fromUsername': me.username,
@@ -681,6 +745,50 @@ class _CloudSocial {
         'sentAt': FieldValue.serverTimestamp(),
       });
     } catch (_) {}
+  }
+
+  /// RSVP to a plan invite: tell the sender, clear the invite, and (when
+  /// going) keep the plan on my own list too.
+  static Future<void> _respondInvite(PlanInvite invite, bool going) async {
+    final uid = _uid;
+    final me = AuthService.user.value;
+    if (uid == null || me == null) return;
+    if (invite.fromUid.isNotEmpty && invite.planId.isNotEmpty) {
+      try {
+        await _db
+            .collection('users').doc(invite.fromUid)
+            .collection('planReplies').doc('${invite.planId}_$uid')
+            .set({
+          'planId': invite.planId,
+          'fromUid': uid,
+          'name': me.name,
+          'username': me.username,
+          'going': going,
+          'sentAt': FieldValue.serverTimestamp(),
+        });
+      } catch (e) {
+        debugPrint('plan reply failed: $e');
+      }
+    }
+    try {
+      await _db.collection('users').doc(uid)
+          .collection('planInvites').doc(invite.id).delete();
+    } catch (_) {}
+    if (going && PlanStore.byId(invite.planId) == null) {
+      await PlanStore.create(
+        restaurantId: '',
+        restaurantName: invite.restaurantName,
+        address: invite.address,
+        when: invite.when,
+      );
+    }
+  }
+
+  /// Re-fetch every friend's categories (auto-links matching names).
+  static Future<void> _refreshAllCategories() async {
+    for (final uid in _friendByUid.keys.toList()) {
+      await _fetchCategories(uid);
+    }
   }
 
   static Future<void> _removeFriend(Friend f) async {
@@ -707,7 +815,13 @@ class _CloudSync {
     _uid = uid;
     RestaurantDatabase.onUpsert = (r) => _pushRestaurant(r);
     RestaurantDatabase.onDelete = (id) => _deleteRestaurant(id);
-    CategoryStore.onChanged = _pushCategories;
+    CategoryStore.onChanged = () {
+      _pushCategories();
+      // My categories changed — re-check for name matches with friends'.
+      for (final cats in SocialService.cloudCategories.values) {
+        CategoryMapping.autoLink(cats, CategoryStore.all.value);
+      }
+    };
     AppPrefs.categoriesViewable.addListener(_pushPrefs);
     AppPrefs.defaultVisibility.addListener(_pushPrefs);
     _initialPush();

@@ -13,6 +13,10 @@ class Plan {
   final DateTime when;
   final List<String> friendUsernames;
 
+  /// Usernames who accepted / declined the invite.
+  final List<String> going;
+  final List<String> declined;
+
   const Plan({
     required this.id,
     required this.restaurantId,
@@ -20,7 +24,20 @@ class Plan {
     required this.address,
     required this.when,
     this.friendUsernames = const [],
+    this.going = const [],
+    this.declined = const [],
   });
+
+  Plan copyWith({List<String>? going, List<String>? declined}) => Plan(
+        id: id,
+        restaurantId: restaurantId,
+        restaurantName: restaurantName,
+        address: address,
+        when: when,
+        friendUsernames: friendUsernames,
+        going: going ?? this.going,
+        declined: declined ?? this.declined,
+      );
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -29,6 +46,8 @@ class Plan {
         'address': address,
         'when': when.millisecondsSinceEpoch,
         'friendUsernames': friendUsernames,
+        'going': going,
+        'declined': declined,
       };
 
   factory Plan.fromJson(Map<String, dynamic> j) => Plan(
@@ -40,12 +59,20 @@ class Plan {
         friendUsernames: (j['friendUsernames'] as List? ?? [])
             .map((e) => e.toString())
             .toList(),
+        going:
+            (j['going'] as List? ?? []).map((e) => e.toString()).toList(),
+        declined:
+            (j['declined'] as List? ?? []).map((e) => e.toString()).toList(),
       );
 }
 
 /// An invite a friend sent you.
 class PlanInvite {
   final String id;
+
+  /// The sender's plan id + uid — where the RSVP goes back to.
+  final String planId;
+  final String fromUid;
   final String fromName;
   final String restaurantName;
   final String address;
@@ -53,6 +80,8 @@ class PlanInvite {
 
   const PlanInvite({
     required this.id,
+    this.planId = '',
+    this.fromUid = '',
     required this.fromName,
     required this.restaurantName,
     required this.address,
@@ -107,6 +136,34 @@ class PlanStore {
 
   static Future<void> delete(String id) async {
     all.value = all.value.where((p) => p.id != id).toList();
+    await _save();
+  }
+
+  static Plan? byId(String id) {
+    for (final p in all.value) {
+      if (p.id == id) return p;
+    }
+    return null;
+  }
+
+  /// Record a friend's RSVP on one of my plans.
+  static Future<void> applyReply(
+      String planId, String username, bool going) async {
+    final plan = byId(planId);
+    if (plan == null || username.isEmpty) return;
+    all.value = [
+      for (final p in all.value)
+        p.id == planId
+            ? p.copyWith(
+                going: going
+                    ? {...p.going, username}.toList()
+                    : p.going.where((u) => u != username).toList(),
+                declined: going
+                    ? p.declined.where((u) => u != username).toList()
+                    : {...p.declined, username}.toList(),
+              )
+            : p
+    ];
     await _save();
   }
 }

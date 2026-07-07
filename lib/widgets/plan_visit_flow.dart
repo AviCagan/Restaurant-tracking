@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../data/friend_group_store.dart';
 import '../data/plan_store.dart';
 import '../data/social_service.dart';
 import '../services/notification_service.dart';
 import '../theme/app_theme.dart';
+import 'group_sheets.dart';
 
 /// Full "plan a visit" flow: date & time, invite friends (they get
 /// notified), add to calendar, and reminders before/after.
@@ -85,7 +87,36 @@ Future<bool> showPlanVisitFlow(
                 if (friends.isEmpty)
                   Text('No friends yet — add some on the Friends tab.',
                       style: TextStyle(fontSize: 12.5, color: colors.subtle))
-                else
+                else ...[
+                  // Whole groups in one tap.
+                  if (FriendGroupStore.all.value.isNotEmpty) ...[
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: FriendGroupStore.all.value.map((g) {
+                        final members = friends
+                            .map((f) => f.username)
+                            .where(g.usernames.contains)
+                            .toSet();
+                        final on = members.isNotEmpty &&
+                            invited.containsAll(members);
+                        return FilterChip(
+                          selected: on,
+                          selectedColor:
+                              AppTheme.accent.withValues(alpha: 0.18),
+                          checkmarkColor: AppTheme.accent,
+                          avatar: GroupAvatar(group: g, size: 18),
+                          label: Text(g.name),
+                          onSelected: members.isEmpty
+                              ? null
+                              : (_) => setSheet(() => on
+                                  ? invited.removeAll(members)
+                                  : invited.addAll(members)),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
@@ -103,6 +134,7 @@ Future<bool> showPlanVisitFlow(
                       );
                     }).toList(),
                   ),
+                ],
                 const SizedBox(height: 10),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,

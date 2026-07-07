@@ -55,6 +55,10 @@ class FeedItem {
   final double rating;
   final DateTime when;
   final String note;
+
+  /// Price tier they rated (1..4, 0 = unknown).
+  final int price;
+
   const FeedItem({
     required this.friendName,
     required this.restaurantName,
@@ -62,6 +66,7 @@ class FeedItem {
     required this.rating,
     required this.when,
     this.note = '',
+    this.price = 0,
   });
 }
 
@@ -70,7 +75,11 @@ class FriendVisit {
   final Friend friend;
   final double rating;
   final String review;
-  const FriendVisit(this.friend, this.rating, this.review);
+
+  /// Price tier they rated (1..4, 0 = unknown).
+  final int price;
+
+  const FriendVisit(this.friend, this.rating, this.review, {this.price = 0});
 
   bool get liked => rating >= 7;
 }
@@ -98,6 +107,19 @@ class SocialService {
 
   /// Set by the cloud layer: sends a plan invite to a friend by username.
   static Future<void> Function(String username, Plan plan)? cloudSendInvite;
+
+  /// Set by the cloud layer: RSVP to a plan invite (true = going).
+  static Future<void> Function(PlanInvite invite, bool going)?
+      cloudRespondInvite;
+
+  /// Set by the cloud layer: re-fetch every friend's categories (and
+  /// auto-link matching ones).
+  static Future<void> Function()? cloudRefreshCategories;
+
+  /// Accept or decline a plan invite.
+  static Future<void> respondInvite(PlanInvite invite, bool going) async {
+    await cloudRespondInvite?.call(invite, going);
+  }
 
   static final ValueNotifier<List<Friend>> friends =
       ValueNotifier<List<Friend>>([]);

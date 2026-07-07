@@ -159,21 +159,8 @@ class _UpcomingPlans extends StatelessWidget {
                           fontWeight: FontWeight.w800,
                           color: colors.ink)),
                 ),
-                ...upcoming.map((p) => _planRow(
-                      context,
-                      emoji: '📅',
-                      title: p.restaurantName,
-                      subtitle:
-                          '${DateFormat.MMMEd().add_jm().format(p.when)}'
-                          '${p.friendUsernames.isEmpty ? '' : ' · ${p.friendUsernames.length} invited'}',
-                      onDelete: () => PlanStore.delete(p.id),
-                    )),
-                ...invites.map((i) => _planRow(
-                      context,
-                      emoji: '💌',
-                      title: '${i.fromName} → ${i.restaurantName}',
-                      subtitle: DateFormat.MMMEd().add_jm().format(i.when),
-                    )),
+                ...upcoming.map((p) => _myPlanRow(context, p)),
+                ...invites.map((i) => _inviteRow(context, i)),
               ],
             );
           },
@@ -182,11 +169,130 @@ class _UpcomingPlans extends StatelessWidget {
     );
   }
 
-  Widget _planRow(BuildContext context,
-      {required String emoji,
-      required String title,
-      required String subtitle,
-      VoidCallback? onDelete}) {
+  static String _firstNameFor(String username) {
+    for (final f in SocialService.friends.value) {
+      if (f.username == username) return f.name.split(' ').first;
+    }
+    return username;
+  }
+
+  /// One of my plans: date, who's in, and — tucked in the corner — a tap
+  /// target listing who couldn't make it.
+  Widget _myPlanRow(BuildContext context, Plan p) {
+    final colors = context.colors;
+    final going = p.going.map(_firstNameFor).toList();
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: AppTheme.panel(context, radius: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text('📅', style: TextStyle(fontSize: 20)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(p.restaurantName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w800, fontSize: 14)),
+                    Text(
+                        '${DateFormat.MMMEd().add_jm().format(p.when)}'
+                        '${p.friendUsernames.isEmpty ? '' : ' · ${p.friendUsernames.length} invited'}',
+                        style:
+                            TextStyle(fontSize: 12, color: colors.subtle)),
+                  ],
+                ),
+              ),
+              if (p.declined.isNotEmpty)
+                GestureDetector(
+                  onTap: () => _showDeclined(context, p),
+                  child: Container(
+                    margin: const EdgeInsets.only(left: 6),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE0484D).withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      '${p.declined.length} can\'t',
+                      style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFFE0484D)),
+                    ),
+                  ),
+                ),
+              IconButton(
+                icon: Icon(Icons.close, size: 18, color: colors.subtle),
+                onPressed: () => PlanStore.delete(p.id),
+              ),
+            ],
+          ),
+          if (going.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(left: 32, bottom: 4),
+              child: Text('✅ In: ${going.join(', ')}',
+                  style: const TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF2E9E5B))),
+            ),
+        ],
+      ),
+    );
+  }
+
+  void _showDeclined(BuildContext context, Plan p) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: context.colors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Couldn\'t make it 😢',
+                  style:
+                      AppTheme.heading(18, color: sheetContext.colors.ink)),
+              const SizedBox(height: 10),
+              ...p.declined.map((u) => Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    child: Row(
+                      children: [
+                        PersonAvatar(name: _firstNameFor(u), size: 32),
+                        const SizedBox(width: 10),
+                        Text(_firstNameFor(u),
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w700, fontSize: 14)),
+                        const Spacer(),
+                        Text('@$u',
+                            style: TextStyle(
+                                fontSize: 12,
+                                color: sheetContext.colors.subtle)),
+                      ],
+                    ),
+                  )),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// An invite from a friend, with accept / decline right on the card.
+  Widget _inviteRow(BuildContext context, PlanInvite i) {
     final colors = context.colors;
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
@@ -194,27 +300,47 @@ class _UpcomingPlans extends StatelessWidget {
       decoration: AppTheme.panel(context, radius: 16),
       child: Row(
         children: [
-          Text(emoji, style: const TextStyle(fontSize: 20)),
+          const Text('💌', style: TextStyle(fontSize: 20)),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title,
+                Text('${i.fromName} → ${i.restaurantName}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                         fontWeight: FontWeight.w800, fontSize: 14)),
-                Text(subtitle,
+                Text(DateFormat.MMMEd().add_jm().format(i.when),
                     style: TextStyle(fontSize: 12, color: colors.subtle)),
               ],
             ),
           ),
-          if (onDelete != null)
-            IconButton(
-              icon: Icon(Icons.close, size: 18, color: colors.subtle),
-              onPressed: onDelete,
-            ),
+          IconButton(
+            tooltip: 'I\'m in!',
+            icon: const Icon(Icons.check_circle,
+                color: Color(0xFF2E9E5B), size: 26),
+            onPressed: () async {
+              await SocialService.respondInvite(i, true);
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                    content: Text(
+                        'You\'re in — added ${i.restaurantName} to your plans! 🙌')));
+              }
+            },
+          ),
+          IconButton(
+            tooltip: 'Can\'t make it',
+            icon: Icon(Icons.cancel_outlined, color: colors.subtle, size: 24),
+            onPressed: () async {
+              await SocialService.respondInvite(i, false);
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                    content: Text(
+                        'Let ${i.fromName} know you can\'t make it.')));
+              }
+            },
+          ),
         ],
       ),
     );

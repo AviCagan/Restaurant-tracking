@@ -30,6 +30,8 @@ class AppPrefs {
     notifArrival.value = p.getBool(_notifArrivalKey) ?? true;
     notifFriends.value = p.getBool(_notifFriendsKey) ?? true;
     notifFriendsFilter.value = p.getString(_notifFilterKey) ?? '';
+    notifSocial.value = p.getBool(_notifSocialKey) ?? true;
+    notifPlans.value = p.getBool(_notifPlansKey) ?? true;
     wrappedLastShown.value = p.getString(_wrappedKey) ?? '';
     themeAccent.value = p.getInt(_themeAccentKey) ?? 0;
   }
@@ -72,6 +74,27 @@ class AppPrefs {
 
   /// Notify when friends share new ratings.
   static final ValueNotifier<bool> notifFriends = ValueNotifier<bool>(true);
+
+  static const _notifSocialKey = 'notif_social';
+  static const _notifPlansKey = 'notif_plans';
+
+  /// Notify on friend requests and accepted requests.
+  static final ValueNotifier<bool> notifSocial = ValueNotifier<bool>(true);
+
+  /// Notify on plan invites and RSVPs.
+  static final ValueNotifier<bool> notifPlans = ValueNotifier<bool>(true);
+
+  static Future<void> setNotifSocial(bool b) async {
+    notifSocial.value = b;
+    final p = await SharedPreferences.getInstance();
+    await p.setBool(_notifSocialKey, b);
+  }
+
+  static Future<void> setNotifPlans(bool b) async {
+    notifPlans.value = b;
+    final p = await SharedPreferences.getInstance();
+    await p.setBool(_notifPlansKey, b);
+  }
 
   /// JSON: {"mode":"all"|"groups"|"friends","ids":[...]} — empty = everyone.
   static final ValueNotifier<String> notifFriendsFilter =

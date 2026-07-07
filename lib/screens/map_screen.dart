@@ -11,6 +11,7 @@ import '../data/filter_state.dart';
 import '../data/friend_group_store.dart';
 import '../data/restaurant_database.dart';
 import '../data/social_service.dart';
+import '../models/price_tier.dart';
 import '../models/restaurant.dart';
 import '../services/location_service.dart';
 import '../theme/app_theme.dart';
@@ -25,7 +26,12 @@ class _Rater {
   final double rating;
   final String review;
   final bool isYou;
-  const _Rater(this.name, this.rating, this.review, this.isYou);
+
+  /// Price tier they rated (1..4, 0 = unknown).
+  final int price;
+
+  const _Rater(this.name, this.rating, this.review, this.isYou,
+      {this.price = 0});
   bool get liked => rating >= 7;
 }
 
@@ -139,13 +145,15 @@ class _MapScreenState extends State<MapScreen> {
       final p = acc(mp.name, mp.address, mp.lat, mp.lng);
       p.categoryKeys.addAll(mp.categoryKeys);
       for (final v in mp.visits) {
-        p.raters.add(_Rater(v.friend.name, v.rating, v.review, false));
+        p.raters.add(
+            _Rater(v.friend.name, v.rating, v.review, false, price: v.price));
       }
     }
     for (final r in _myPlaces) {
       final p = acc(r.name, r.address, r.lat!, r.lng!);
       p.categoryKeys.addAll(r.categoryKeys);
-      p.raters.add(_Rater('You', r.overallRating, '', true));
+      p.raters.add(_Rater('You', r.overallRating, '', true,
+          price: r.visits.isEmpty ? 0 : r.avgPrice.round()));
     }
     return byName.values.toList();
   }
@@ -514,9 +522,25 @@ class _MapScreenState extends State<MapScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(v.isYou ? 'You' : v.name,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w800, fontSize: 14)),
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(v.isYou ? 'You' : v.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w800, fontSize: 14)),
+                    ),
+                    if (v.price > 0) ...[
+                      const SizedBox(width: 6),
+                      Text(PriceTier.signs(v.price),
+                          style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                              color: colors.subtle)),
+                    ],
+                  ],
+                ),
                 if (v.review.isNotEmpty)
                   Text('“${v.review}”',
                       style: TextStyle(

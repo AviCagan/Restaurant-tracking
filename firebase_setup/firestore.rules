@@ -38,6 +38,13 @@ service cloud.firestore {
         allow read, delete: if isMe(uid);
       }
 
+      match /planReplies/{replyId} {
+        // Invitees RSVP back into the plan owner's inbox.
+        allow create: if signedIn() &&
+          request.resource.data.fromUid == request.auth.uid;
+        allow read, delete: if isMe(uid);
+      }
+
       match /restaurants/{restaurantId} {
         // Owner: full access. Friends: read only docs marked for friends.
         allow read: if isMe(uid) ||

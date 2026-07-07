@@ -690,9 +690,25 @@ class _FriendVisitRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(visit.friend.name,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w800, fontSize: 14)),
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(visit.friend.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w800, fontSize: 14)),
+                    ),
+                    if (visit.price > 0) ...[
+                      const SizedBox(width: 6),
+                      Text(PriceTier.signs(visit.price),
+                          style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                              color: colors.subtle)),
+                    ],
+                  ],
+                ),
                 const SizedBox(height: 1),
                 Text('“${visit.review}”',
                     style: TextStyle(
