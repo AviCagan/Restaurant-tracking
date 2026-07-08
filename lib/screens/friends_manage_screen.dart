@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
+import '../data/block_store.dart';
 import '../data/friend_group_store.dart';
 import '../data/social_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/feed_card.dart';
+import '../widgets/friend_actions.dart';
 import '../widgets/gradient_app_bar.dart';
 import '../widgets/group_sheets.dart';
 import 'friend_profile_screen.dart';
@@ -170,22 +172,70 @@ class _FriendsManageScreenState extends State<FriendsManageScreen> {
                       child: Text('No friends yet — add some above.',
                           style: TextStyle(color: colors.subtle)),
                     ),
+                  if (friends.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8, left: 2),
+                      child: Text('Tip: press & hold a friend to block them.',
+                          style:
+                              TextStyle(color: colors.subtle, fontSize: 12)),
+                    ),
                   ...friends.map((f) => _FriendTile(
                         friend: f,
                         onTap: () => _openProfile(f),
+                        onLongPress: () => FriendActions.showSheet(context, f,
+                            onOpenProfile: () => _openProfile(f)),
                         trailing: IconButton(
                           icon: Icon(Icons.person_remove_outlined,
                               color: colors.subtle),
                           onPressed: () =>
-                              setState(() => SocialService.removeFriend(f)),
+                              FriendActions.confirmRemove(context, f),
                         ),
                       )),
                 ],
               );
             },
           ),
+          const _BlockedSection(),
         ],
       ),
+    );
+  }
+}
+
+/// Blocked users, with an unblock button. Hidden when nobody is blocked.
+class _BlockedSection extends StatelessWidget {
+  const _BlockedSection();
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return ValueListenableBuilder<Set<String>>(
+      valueListenable: BlockStore.blocked,
+      builder: (context, blocked, _) {
+        if (blocked.isEmpty) return const SizedBox.shrink();
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 20),
+            _SectionHeader('Blocked (${blocked.length})'),
+            ...blocked.map((u) => Container(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  decoration: AppTheme.panel(context, radius: 16),
+                  child: ListTile(
+                    leading: Icon(Icons.block, color: colors.subtle),
+                    title: Text('@$u',
+                        style: const TextStyle(fontWeight: FontWeight.w700)),
+                    trailing: TextButton(
+                      onPressed: () => SocialService.unblock(u),
+                      style: TextButton.styleFrom(
+                          foregroundColor: AppTheme.accent),
+                      child: const Text('Unblock'),
+                    ),
+                  ),
+                )),
+          ],
+        );
+      },
     );
   }
 }
@@ -203,10 +253,14 @@ class _SectionHeader extends StatelessWidget {
 
 class _FriendTile extends StatelessWidget {
   const _FriendTile(
-      {required this.friend, required this.trailing, this.onTap});
+      {required this.friend,
+      required this.trailing,
+      this.onTap,
+      this.onLongPress});
   final Friend friend;
   final Widget trailing;
   final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -216,6 +270,7 @@ class _FriendTile extends StatelessWidget {
       decoration: AppTheme.panel(context, radius: 16),
       child: ListTile(
         onTap: onTap,
+        onLongPress: onLongPress,
         leading: PersonAvatar(name: friend.name),
         title: Text(friend.name,
             style: const TextStyle(fontWeight: FontWeight.w700)),

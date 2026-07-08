@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/social_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/feed_card.dart';
+import '../widgets/friend_actions.dart';
 import '../widgets/gradient_app_bar.dart';
 import 'compare_categories_screen.dart';
 
@@ -98,6 +99,22 @@ class FriendProfileScreen extends StatelessWidget {
                   padding: const EdgeInsets.only(bottom: 12),
                   child: FeedCard(item: r, showWho: false),
                 )),
+
+          const SizedBox(height: 28),
+          Center(
+            child: TextButton.icon(
+              onPressed: () async {
+                final blocked =
+                    await FriendActions.confirmBlock(context, friend);
+                // Leave the profile once they're blocked.
+                if (blocked && context.mounted) Navigator.pop(context);
+              },
+              icon: const Icon(Icons.block, size: 16),
+              style: TextButton.styleFrom(foregroundColor: colors.subtle),
+              label: Text('Block @${friend.username}',
+                  style: const TextStyle(fontSize: 13)),
+            ),
+          ),
         ],
       ),
     );

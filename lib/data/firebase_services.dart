@@ -16,6 +16,7 @@ import '../models/user_profile.dart';
 import '../services/notification_service.dart';
 import 'app_prefs.dart';
 import 'auth_service.dart';
+import 'block_store.dart';
 import 'category_mapping.dart';
 import 'category_store.dart';
 import 'friend_group_store.dart';
@@ -474,9 +475,10 @@ class _CloudSocial {
         .listen((snap) {
       _friendByUid.clear();
       for (final d in snap.docs) {
+        final username = d.data()['username'] as String? ?? d.id;
+        if (BlockStore.isBlocked(username)) continue; // stay hidden
         _friendByUid[d.id] = Friend(
-            d.data()['name'] as String? ?? 'Friend',
-            d.data()['username'] as String? ?? d.id);
+            d.data()['name'] as String? ?? 'Friend', username);
       }
       SocialService.friends.value = _friendByUid.values.toList();
       // A new doc here that *I* didn't create means someone accepted my
@@ -503,10 +505,18 @@ class _CloudSocial {
         .collection('users').doc(uid).collection('friendRequests')
         .snapshots()
         .listen((snap) {
+      // Silently drop requests from people I've blocked.
+      for (final d in snap.docs) {
+        final username = d.data()['username'] as String? ?? d.id;
+        if (BlockStore.isBlocked(username)) {
+          d.reference.delete().catchError((_) {});
+        }
+      }
       SocialService.requests.value = [
         for (final d in snap.docs)
-          Friend(d.data()['name'] as String? ?? 'Someone',
-              d.data()['username'] as String? ?? d.id)
+          if (!BlockStore.isBlocked(d.data()['username'] as String? ?? d.id))
+            Friend(d.data()['name'] as String? ?? 'Someone',
+                d.data()['username'] as String? ?? d.id)
       ];
       // Pop a notification for requests that arrive while signed in (not
       // for ones already waiting when the listener starts).
@@ -514,6 +524,9 @@ class _CloudSocial {
         for (final change in snap.docChanges) {
           if (change.type != DocumentChangeType.added) continue;
           final data = change.doc.data() ?? {};
+          if (BlockStore.isBlocked(data['username'] as String? ?? '')) {
+            continue;
+          }
           NotificationService.show(
             'New friend request 👋',
             '${data['name'] ?? 'Someone'} (@${data['username'] ?? '?'}) '

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import 'data/app_prefs.dart';
 import 'data/auth_service.dart';
+import 'data/block_store.dart';
 import 'data/category_mapping.dart';
 import 'data/category_store.dart';
 import 'data/firebase_services.dart';
@@ -29,6 +30,7 @@ Future<void> main() async {
   await FolderStore.load();
   await FriendGroupStore.load();
   await PlanStore.load();
+  await BlockStore.load();
   await AuthService.load();
 
   // Cloud layer — if Firebase isn't configured on this machine, the app

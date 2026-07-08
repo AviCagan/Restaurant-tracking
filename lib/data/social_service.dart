@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../models/category.dart';
+import 'block_store.dart';
 import 'plan_store.dart';
 
 /// A place on the food map that friends have rated.
@@ -212,6 +213,22 @@ class SocialService {
     }
     friends.value = friends.value.where((x) => x.username != f.username).toList();
   }
+
+  /// Block someone: drop the friendship and hide them everywhere. Their
+  /// pending request (if any) is dismissed too.
+  static Future<void> block(Friend f) async {
+    await BlockStore.block(f.username);
+    if (cloudMode) {
+      cloudRemoveFriend?.call(f);
+      cloudDeclineRequest?.call(f);
+    }
+    friends.value =
+        friends.value.where((x) => x.username != f.username).toList();
+    requests.value =
+        requests.value.where((x) => x.username != f.username).toList();
+  }
+
+  static Future<void> unblock(String username) => BlockStore.unblock(username);
 
   static void acceptRequest(Friend f) {
     if (cloudMode) {

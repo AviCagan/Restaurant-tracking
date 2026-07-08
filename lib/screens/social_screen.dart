@@ -10,6 +10,7 @@ import '../models/user_profile.dart';
 import '../services/notification_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/feed_card.dart';
+import '../widgets/friend_actions.dart';
 import '../widgets/group_sheets.dart';
 import '../widgets/sign_in_prompt.dart';
 import 'friend_profile_screen.dart';
@@ -557,6 +558,8 @@ class _FriendsRow extends StatelessWidget {
               ...friends.map((f) => _RowItem(
                     label: f.name.split(' ').first,
                     onTap: () => onTapFriend(f),
+                    onLongPress: () => FriendActions.showSheet(context, f,
+                        onOpenProfile: () => onTapFriend(f)),
                     child: PersonAvatar(name: f.name, size: 56),
                   )),
             ],
@@ -569,10 +572,14 @@ class _FriendsRow extends StatelessWidget {
 
 class _RowItem extends StatelessWidget {
   const _RowItem(
-      {required this.child, required this.label, required this.onTap});
+      {required this.child,
+      required this.label,
+      required this.onTap,
+      this.onLongPress});
   final Widget child;
   final String label;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -581,6 +588,7 @@ class _RowItem extends StatelessWidget {
       padding: const EdgeInsets.only(right: 14),
       child: GestureDetector(
         onTap: onTap,
+        onLongPress: onLongPress,
         child: Column(
           children: [
             child,
