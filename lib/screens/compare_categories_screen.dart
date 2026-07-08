@@ -37,11 +37,22 @@ class _CompareCategoriesScreenState extends State<CompareCategoriesScreen> {
       CategoryMapping.autoLink(
           SocialService.categoriesFor(f.name), CategoryStore.all.value);
     }
-    // And pull fresh copies from the cloud in case the cache is stale or
-    // was fetched before the friend synced; re-links when they land.
+    // Re-run auto-linking, and rebuild when a friend's categories arrive
+    // live (the cloud layer nudges the friends notifier on every update).
     SocialService.cloudRefreshCategories?.call().then((_) {
       if (mounted) setState(() {});
     });
+    SocialService.friends.addListener(_onFriendsChanged);
+  }
+
+  void _onFriendsChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    SocialService.friends.removeListener(_onFriendsChanged);
+    super.dispose();
   }
 
   Future<bool> _confirm(String title, String body, String action) async {

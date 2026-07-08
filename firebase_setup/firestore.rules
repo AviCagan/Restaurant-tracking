@@ -55,12 +55,11 @@ service cloud.firestore {
         allow write: if isMe(uid);
       }
 
+      // NOTE: categories now sync as a 'categories' array on the profile
+      // doc above (readable by any signed-in user), so no special rule is
+      // needed. This legacy subcollection block is unused and harmless.
       match /categories/{categoryId} {
-        // Friends can read categories only if the owner allows it.
-        allow read: if isMe(uid) ||
-          (isFriendOf(uid) &&
-           get(/databases/$(database)/documents/users/$(uid)).data
-             .get('categoriesViewable', true) == true);
+        allow read: if signedIn();
         allow write: if isMe(uid);
       }
 

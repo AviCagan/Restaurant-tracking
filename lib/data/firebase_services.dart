@@ -348,6 +348,7 @@ class _CloudSocial {
   static StreamSubscription? _invitesSub;
   static StreamSubscription? _repliesSub;
   static final Map<String, StreamSubscription> _restaurantSubs = {};
+  static final Map<String, StreamSubscription> _profileSubs = {};
   static final Map<String, List<Restaurant>> _friendRestaurants = {};
   static final Map<String, Friend> _friendByUid = {};
 
@@ -547,7 +548,11 @@ class _CloudSocial {
     for (final s in _restaurantSubs.values) {
       s.cancel();
     }
+    for (final s in _profileSubs.values) {
+      s.cancel();
+    }
     _restaurantSubs.clear();
+    _profileSubs.clear();
     _friendRestaurants.clear();
     _friendByUid.clear();
     _selfAccepted.clear();
@@ -559,6 +564,7 @@ class _CloudSocial {
     for (final uid in _restaurantSubs.keys.toList()) {
       if (!_friendByUid.containsKey(uid)) {
         _restaurantSubs.remove(uid)?.cancel();
+        _profileSubs.remove(uid)?.cancel();
         _friendRestaurants.remove(uid);
       }
     }
@@ -584,9 +590,40 @@ class _CloudSocial {
         _rebuildCaches();
       }, onError: (e) =>
           debugPrint('friend restaurants listen failed ($uid): $e'));
-      _fetchCategories(uid);
+
+      // Live categories: read the friend's profile doc (any signed-in user
+      // may read it — no special rules) and update whenever it changes.
+      _profileSubs[uid] = _db
+          .collection('users').doc(uid)
+          .snapshots()
+          .listen((doc) => _applyFriendCategories(uid, doc.data()),
+              onError: (e) =>
+                  debugPrint('friend profile listen failed ($uid): $e'));
     }
     _rebuildCaches();
+  }
+
+  /// Parse a friend's categories array off their profile doc, cache it, and
+  /// auto-link same-named categories to mine.
+  static void _applyFriendCategories(
+      String uid, Map<String, dynamic>? data) {
+    final friend = _friendByUid[uid];
+    if (friend == null) return;
+    final cats = <AppCategory>[
+      for (final c in (data?['categories'] as List? ?? []))
+        if (c is Map && (c['key'] as String? ?? '').isNotEmpty)
+          AppCategory(
+            key: c['key'] as String,
+            label: c['label'] as String? ?? 'Category',
+            iconIndex: (c['iconIndex'] as num?)?.toInt() ?? 0,
+          )
+    ];
+    SocialService.cloudCategories[friend.name] = cats;
+    CategoryMapping.autoLink(cats, CategoryStore.all.value);
+    debugPrint('categories for ${friend.name}: ${cats.length} live, '
+        '${CategoryMapping.map.value.length} total links');
+    // Nudge open screens (compare/map) to rebuild.
+    SocialService.friends.value = List.of(SocialService.friends.value);
   }
 
   static void _notifyNewRatings(
@@ -633,50 +670,6 @@ class _CloudSocial {
     } catch (_) {
       return null;
     }
-  }
-
-  static Future<void> _fetchCategories(String uid) async {
-    final friend = _friendByUid[uid];
-    if (friend == null) return;
-    var cats = <AppCategory>[];
-    try {
-      final snap = await _db
-          .collection('users').doc(uid).collection('categories').get();
-      cats = [
-        for (final d in snap.docs)
-          AppCategory(
-            key: d.data()['key'] as String? ?? d.id,
-            label: d.data()['label'] as String? ?? 'Category',
-            iconIndex: (d.data()['iconIndex'] as num?)?.toInt() ?? 0,
-          )
-      ];
-    } catch (e) {
-      debugPrint('categories subcollection read failed for '
-          '${friend.name}: $e');
-    }
-    if (cats.isEmpty) {
-      // Fallback: the categories array mirrored onto the profile doc
-      // (works even when subcollection rules are stale).
-      try {
-        final doc = await _db.collection('users').doc(uid).get();
-        cats = [
-          for (final c in (doc.data()?['categories'] as List? ?? []))
-            AppCategory(
-              key: (c as Map)['key'] as String? ?? '',
-              label: c['label'] as String? ?? 'Category',
-              iconIndex: (c['iconIndex'] as num?)?.toInt() ?? 0,
-            )
-        ]..removeWhere((c) => c.key.isEmpty);
-      } catch (e) {
-        debugPrint('categories profile read failed for ${friend.name}: $e');
-      }
-    }
-    SocialService.cloudCategories[friend.name] = cats;
-    // Same category, same name? Link them automatically — no manual
-    // "your Chinese = my Chinese" step.
-    await CategoryMapping.autoLink(cats, CategoryStore.all.value);
-    debugPrint('categories for ${friend.name}: ${cats.length} fetched, '
-        '${CategoryMapping.map.value.length} total links');
   }
 
   static void _rebuildCaches() {
@@ -901,10 +894,12 @@ class _CloudSocial {
     }
   }
 
-  /// Re-fetch every friend's categories (auto-links matching names).
+  /// Re-run auto-linking over the live-cached categories (called when the
+  /// compare screen opens). The profile listeners keep the data itself
+  /// fresh, so this just re-matches against my current categories.
   static Future<void> _refreshAllCategories() async {
-    for (final uid in _friendByUid.keys.toList()) {
-      await _fetchCategories(uid);
+    for (final cats in SocialService.cloudCategories.values) {
+      await CategoryMapping.autoLink(cats, CategoryStore.all.value);
     }
   }
 
@@ -1008,22 +1003,13 @@ class _CloudSync {
     } catch (_) {}
   }
 
+  /// Categories live as a single array on the user's profile doc. Any
+  /// signed-in friend can already read the profile doc, so this needs no
+  /// special rules — it's the whole sync in one write. Respects the
+  /// "let friends see my categories" toggle (empty when off).
   static Future<void> _pushCategories() async {
     final uid = _uid;
     if (uid == null) return;
-    try {
-      final batch = _db.batch();
-      for (final c in CategoryStore.all.value) {
-        batch.set(
-            _db.collection('users').doc(uid).collection('categories').doc(c.key),
-            {'key': c.key, 'label': c.label, 'iconIndex': c.iconIndex});
-      }
-      await batch.commit();
-    } catch (e) {
-      debugPrint('categories push failed: $e');
-    }
-    // Mirror onto the profile doc too — friends read this even when the
-    // subcollection rules in their project are out of date.
     try {
       await _db.collection('users').doc(uid).set({
         'categories': AppPrefs.categoriesViewable.value
@@ -1033,8 +1019,10 @@ class _CloudSync {
               ]
             : [],
       }, SetOptions(merge: true));
+      debugPrint('pushed ${CategoryStore.all.value.length} categories to '
+          'profile doc');
     } catch (e) {
-      debugPrint('categories mirror failed: $e');
+      debugPrint('categories push failed: $e');
     }
   }
 
