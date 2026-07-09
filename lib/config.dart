@@ -41,4 +41,8 @@ class AppConfig {
       emailJsServiceId.isNotEmpty &&
       emailJsTemplateId.isNotEmpty &&
       emailJsPublicKey.isNotEmpty;
+
+  /// Play Store link for the Android app. Empty until it's published —
+  /// the web version then tells Android visitors to ask for the APK.
+  static const String playStoreUrl = '';
 }

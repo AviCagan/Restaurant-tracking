@@ -10,6 +10,9 @@ external JSPromise<JSBoolean> _install();
 @JS('yumsIsIos')
 external bool _isIos();
 
+@JS('yumsIsAndroid')
+external bool _isAndroid();
+
 @JS('yumsIsStandalone')
 external bool _isStandalone();
 
@@ -37,6 +40,14 @@ Future<bool> promptInstallPwa() async {
 bool isIosBrowser() {
   try {
     return _isIos();
+  } catch (_) {
+    return false;
+  }
+}
+
+bool isAndroidBrowser() {
+  try {
+    return _isAndroid();
   } catch (_) {
     return false;
   }

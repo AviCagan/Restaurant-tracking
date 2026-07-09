@@ -16,6 +16,7 @@ import '../models/restaurant.dart';
 import '../models/user_profile.dart';
 import '../services/email_service.dart';
 import '../services/notification_service.dart';
+import '../services/rating_digest.dart';
 import 'app_prefs.dart';
 import 'auth_service.dart';
 import 'block_store.dart';
@@ -522,6 +523,7 @@ class _CloudSocial {
       }
       friendsFirst = false;
       _syncRestaurantListeners();
+      _maybeFlushDigests();
     });
 
     var requestsFirst = true;
@@ -790,6 +792,56 @@ class _CloudSocial {
     return snap.exists ? snap.data()!['uid'] as String : null;
   }
 
+  static int _lastDigestSweepMs = 0;
+
+  /// Send compiled rating-digest emails to friends whose digest period
+  /// (day/week, their choice) has ended. One email per friend per period —
+  /// never one per rating. Runs at most every 30 minutes.
+  static Future<void> _maybeFlushDigests() async {
+    final me = AuthService.user.value;
+    if (me == null || !AppConfig.hasEmail) return;
+    final now = DateTime.now();
+    if (now.millisecondsSinceEpoch - _lastDigestSweepMs < 30 * 60 * 1000) {
+      return;
+    }
+    _lastDigestSweepMs = now.millisecondsSinceEpoch;
+
+    for (final entry in _friendByUid.entries.toList()) {
+      try {
+        final doc = await _db.collection('users').doc(entry.key).get();
+        final d = doc.data() ?? {};
+        if (d['emailNotifs'] == false) continue;
+        final freq = d['ratingEmailFreq'] as String? ?? 'daily';
+        if (freq == 'off') continue;
+        final startOfToday = DateTime(now.year, now.month, now.day);
+        final cutoff = freq == 'weekly'
+            ? startOfToday.subtract(Duration(days: now.weekday - 1))
+            : startOfToday;
+        final pending = await RatingDigestStore.pendingFor(
+            entry.key, cutoff.millisecondsSinceEpoch);
+        if (pending.isEmpty) continue;
+        String fmt(double v) => v == v.roundToDouble()
+            ? v.toStringAsFixed(0)
+            : v.toStringAsFixed(1);
+        final lines = [
+          for (final e in pending) '• ${e.name} — ${fmt(e.score)}/10'
+        ];
+        await EmailService.send(
+          toEmail: d['email'] as String? ?? '',
+          toName: d['name'] as String? ?? 'foodie',
+          subject: pending.length == 1
+              ? '🍽️ ${me.name} rated ${pending.first.name} on YUMS'
+              : '🍽️ ${me.name} rated ${pending.length} spots on YUMS',
+          message: '${me.name} recently rated:\n${lines.join('\n')}\n\n'
+              'Open YUMS for the full takes!',
+        );
+        await RatingDigestStore.markFlushed(entry.key);
+      } catch (e) {
+        debugPrint('digest flush skipped for ${entry.value.name}: $e');
+      }
+    }
+  }
+
   /// Best-effort notification email to [uid], respecting their
   /// emailNotifs preference. Never throws.
   static Future<void> _emailUser(
@@ -1017,7 +1069,22 @@ class _CloudSync {
 
   static void start(String uid) {
     _uid = uid;
-    RestaurantDatabase.onUpsert = (r) => _pushRestaurant(r);
+    RestaurantDatabase.onUpsert = (r) {
+      _pushRestaurant(r);
+      // Queue shared ratings for the end-of-day/week digest emails. Only
+      // real local edits land here (initial sync calls _pushRestaurant
+      // directly), so old data never re-queues.
+      final shared =
+          r.visits.where((v) => v.visibility == 'friends').toList();
+      if (shared.isNotEmpty) {
+        shared.sort((a, b) => b.date.compareTo(a.date));
+        final latest = shared.first;
+        RatingDigestStore.record(
+            visitId: latest.id,
+            restaurantName: r.name,
+            score: latest.overall);
+      }
+    };
     RestaurantDatabase.onDelete = (id) => _deleteRestaurant(id);
     CategoryStore.onChanged = () {
       _pushCategories();
@@ -1029,6 +1096,7 @@ class _CloudSync {
     AppPrefs.categoriesViewable.addListener(_pushPrefs);
     AppPrefs.defaultVisibility.addListener(_pushPrefs);
     AppPrefs.emailNotifs.addListener(_pushPrefs);
+    AppPrefs.ratingEmailFreq.addListener(_pushPrefs);
     _initialPush();
   }
 
@@ -1040,6 +1108,7 @@ class _CloudSync {
     AppPrefs.categoriesViewable.removeListener(_pushPrefs);
     AppPrefs.defaultVisibility.removeListener(_pushPrefs);
     AppPrefs.emailNotifs.removeListener(_pushPrefs);
+    AppPrefs.ratingEmailFreq.removeListener(_pushPrefs);
   }
 
   static Future<void> _initialPush() async {
@@ -1128,6 +1197,7 @@ class _CloudSync {
         'categoriesViewable': AppPrefs.categoriesViewable.value,
         'defaultVisibility': AppPrefs.defaultVisibility.value,
         'emailNotifs': AppPrefs.emailNotifs.value,
+        'ratingEmailFreq': AppPrefs.ratingEmailFreq.value,
       }, SetOptions(merge: true));
     } catch (_) {}
     // The mirrored categories list follows the privacy toggle.

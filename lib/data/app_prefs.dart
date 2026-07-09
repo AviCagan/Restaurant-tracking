@@ -33,6 +33,7 @@ class AppPrefs {
     notifSocial.value = p.getBool(_notifSocialKey) ?? true;
     notifPlans.value = p.getBool(_notifPlansKey) ?? true;
     emailNotifs.value = p.getBool(_emailNotifsKey) ?? true;
+    ratingEmailFreq.value = p.getString(_ratingFreqKey) ?? 'daily';
     calendarProvider.value = p.getString(_calendarKey) ?? '';
     a2hsSeen.value = p.getBool(_a2hsKey) ?? false;
     wrappedLastShown.value = p.getString(_wrappedKey) ?? '';
@@ -100,8 +101,20 @@ class AppPrefs {
   }
 
   static const _emailNotifsKey = 'email_notifs';
+  static const _ratingFreqKey = 'rating_email_freq';
   static const _calendarKey = 'calendar_provider';
   static const _a2hsKey = 'a2hs_seen';
+
+  /// How friends' rating emails reach me: 'off', 'daily', or 'weekly'.
+  /// Digests are compiled — one email per friend per period, not per rating.
+  static final ValueNotifier<String> ratingEmailFreq =
+      ValueNotifier<String>('daily');
+
+  static Future<void> setRatingEmailFreq(String v) async {
+    ratingEmailFreq.value = v;
+    final p = await SharedPreferences.getInstance();
+    await p.setString(_ratingFreqKey, v);
+  }
 
   /// Let friends' apps email me about requests and plans (stored on my
   /// profile doc so senders can check it).

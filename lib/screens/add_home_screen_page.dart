@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../config.dart';
 import '../data/app_prefs.dart';
 import '../services/web_bridge/web_bridge.dart' as web;
 import '../theme/app_theme.dart';
@@ -51,6 +53,60 @@ class AddHomeScreenPage extends StatelessWidget {
                       fontWeight: FontWeight.w600),
                 ),
                 const Spacer(),
+                // Android visitors can run the real app — better than any
+                // website (notifications, photos, the works).
+                if (web.isAndroidBrowser()) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.16),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.4)),
+                    ),
+                    child: Column(
+                      children: [
+                        const Text('🤖  You\'re on Android!',
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w800)),
+                        const SizedBox(height: 4),
+                        Text(
+                          AppConfig.playStoreUrl.isEmpty
+                              ? 'The real Android app has notifications, '
+                                  'photos and everything — ask Avi for the '
+                                  'APK! 📲'
+                              : 'The real Android app has notifications, '
+                                  'photos and everything:',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.95),
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600),
+                        ),
+                        if (AppConfig.playStoreUrl.isNotEmpty) ...[
+                          const SizedBox(height: 10),
+                          FilledButton.icon(
+                            style: FilledButton.styleFrom(
+                              backgroundColor: Colors.white,
+                              foregroundColor: AppTheme.accentDark,
+                            ),
+                            onPressed: () => launchUrl(
+                                Uri.parse(AppConfig.playStoreUrl),
+                                mode: LaunchMode.externalApplication),
+                            icon: const Icon(Icons.shop, size: 18),
+                            label: const Text('Get it on Google Play',
+                                style:
+                                    TextStyle(fontWeight: FontWeight.w800)),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                ],
                 if (canInstall)
                   // Android Chrome/Edge: we can pop the real install dialog.
                   SizedBox(

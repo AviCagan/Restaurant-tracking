@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
 import '../data/app_prefs.dart';
@@ -96,13 +97,55 @@ class NotificationSettingsScreen extends StatelessWidget {
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: colors.line),
             ),
-            child: _toggle(
-              colors,
-              AppPrefs.emailNotifs,
-              AppPrefs.setEmailNotifs,
-              'Email notifications',
-              'Requests, invites & RSVPs land in your inbox too — great '
-                  'for the iPhone/web version',
+            child: Column(
+              children: [
+                _toggle(
+                  colors,
+                  AppPrefs.emailNotifs,
+                  AppPrefs.setEmailNotifs,
+                  'Email notifications',
+                  'Requests, invites & RSVPs land in your inbox too — great '
+                      'for the iPhone/web version',
+                ),
+                // Web has no push, so rating digests are its lifeline —
+                // that's why the timeframe lives here on web only.
+                if (kIsWeb) ...[
+                  Divider(height: 1, color: colors.line),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text('Friend rating emails',
+                          style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: colors.ink)),
+                    ),
+                  ),
+                  ValueListenableBuilder<String>(
+                    valueListenable: AppPrefs.ratingEmailFreq,
+                    builder: (context, freq, _) => Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
+                      child: Row(
+                        children: [
+                          _freqChip(context, 'off', 'Off', freq),
+                          const SizedBox(width: 8),
+                          _freqChip(context, 'daily', 'Daily', freq),
+                          const SizedBox(width: 8),
+                          _freqChip(context, 'weekly', 'Weekly', freq),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+                    child: Text(
+                        'Friends\' ratings get bundled into one email after '
+                        'the day (or week) wraps up — no blasting.',
+                        style:
+                            TextStyle(fontSize: 12, color: colors.subtle)),
+                  ),
+                ],
+              ],
             ),
           ),
           const SizedBox(height: 16),
@@ -112,6 +155,33 @@ class NotificationSettingsScreen extends StatelessWidget {
             style: TextStyle(fontSize: 12, color: colors.subtle),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _freqChip(
+      BuildContext context, String value, String label, String current) {
+    final colors = context.colors;
+    final on = value == current;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => AppPrefs.setRatingEmailFreq(value),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 120),
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: on ? AppTheme.accent : colors.background,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: on ? AppTheme.accent : colors.line),
+          ),
+          child: Center(
+            child: Text(label,
+                style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w800,
+                    color: on ? Colors.white : colors.ink)),
+          ),
+        ),
       ),
     );
   }

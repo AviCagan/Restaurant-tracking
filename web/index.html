@@ -43,6 +43,7 @@
       return choice.outcome === 'accepted';
     };
     window.yumsIsIos = () => /iphone|ipad|ipod/i.test(navigator.userAgent);
+    window.yumsIsAndroid = () => /android/i.test(navigator.userAgent);
     window.yumsIsStandalone = () =>
       window.matchMedia('(display-mode: standalone)').matches ||
       window.navigator.standalone === true;
