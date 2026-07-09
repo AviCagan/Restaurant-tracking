@@ -33,9 +33,9 @@ class AppConfig {
   //   3. Account → General: copy the Public Key, and enable
   //      "Allow EmailJS API for non-browser applications".
   // All three values are public identifiers — safe to paste here.
-  static const String emailJsServiceId = '';
-  static const String emailJsTemplateId = '';
-  static const String emailJsPublicKey = '';
+  static const String emailJsServiceId = 'service_z61oizl';
+  static const String emailJsTemplateId = 'template_rzqagkc';
+  static const String emailJsPublicKey = 'k4Ows-VVCo694ZqQ7';
 
   static bool get hasEmail =>
       emailJsServiceId.isNotEmpty &&
