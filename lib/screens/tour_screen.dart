@@ -201,7 +201,7 @@ class _TourScreenState extends State<TourScreen> {
                 }),
               ),
               Padding(
-                padding: EdgeInsets.fromLTRB(20, 14, 20, bottomLift),
+                padding: const EdgeInsets.fromLTRB(20, 14, 20, bottomLift),
                 child: SizedBox(
                   width: double.infinity,
                   height: 54,
