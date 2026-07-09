@@ -39,11 +39,9 @@ class _MainScaffoldState extends State<MainScaffold> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
-      // First time in the app: show the quick tour.
-      if (!AppPrefs.tourSeen.value) {
-        TourScreen.show(context);
-        return;
-      }
+      // First launch shows the tour (rendered in-place by build) — skip
+      // the Wrapped check until a later launch.
+      if (!AppPrefs.tourSeen.value) return;
       // On the 1st of the month: last month's Wrapped (once).
       final now = DateTime.now();
       final lastMonth = DateTime(now.year, now.month - 1, 1);
@@ -92,6 +90,20 @@ class _MainScaffoldState extends State<MainScaffold> {
   @override
   Widget build(BuildContext context) {
     final topInset = MediaQuery.of(context).padding.top;
+    return ValueListenableBuilder<bool>(
+      valueListenable: AppPrefs.tourSeen,
+      builder: (context, tourSeen, child) {
+        // First run: the tour IS the screen — no navigation involved, so
+        // finishing it works identically on Android and the web. It
+        // disappears the instant the "seen" flag flips.
+        if (!tourSeen) return const TourScreen();
+        return child!;
+      },
+      child: _buildScaffold(topInset),
+    );
+  }
+
+  Widget _buildScaffold(double topInset) {
     return Scaffold(
       body: Column(
         children: [

@@ -64,7 +64,8 @@ const _pages = [
     demo: true,
     features: [
       _Feature(Icons.add_circle_outline, 'Tap + to add a spot'),
-      _Feature(Icons.takeout_dining_outlined, 'Takeout? Skip atmosphere'),
+      _Feature(Icons.group_outlined,
+          'Share with your friends in 30 seconds or less!'),
     ],
   ),
   _TourPage(
@@ -86,7 +87,8 @@ const _pages = [
     top: Color(0xFF6FAEDC),
     bottom: Color(0xFF3574A6),
     features: [
-      _Feature(Icons.place_outlined, 'Greener pin = better eats'),
+      _Feature(Icons.place_outlined,
+          'Check out where all the good spots are at!'),
       _Feature(Icons.touch_app_outlined, 'Tap a pin for everyone\'s takes'),
     ],
   ),
@@ -125,9 +127,12 @@ class _TourScreenState extends State<TourScreen> {
     super.dispose();
   }
 
-  void _finish() {
-    AppPrefs.setTourSeen(true);
-    Navigator.of(context, rootNavigator: true).maybePop();
+  Future<void> _finish() async {
+    // First run: MainScaffold swaps us out the moment this flag flips (no
+    // navigation involved). Replays from Settings arrive as a pushed route,
+    // which the maybePop dismisses; on first run it's a safe no-op.
+    await AppPrefs.setTourSeen(true);
+    if (mounted) Navigator.of(context, rootNavigator: true).maybePop();
   }
 
   @override
@@ -273,6 +278,7 @@ class _TourScreenState extends State<TourScreen> {
           ),
           const SizedBox(height: 22),
           if (p.demo) ...[
+            const SizedBox(height: 8),
             _Reveal(
               slot: 3,
               pageKey: index,
@@ -282,19 +288,53 @@ class _TourScreenState extends State<TourScreen> {
                 behavior: HitTestBehavior.opaque,
                 onHorizontalDragStart: (_) {},
                 onHorizontalDragUpdate: (_) {},
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
-                  decoration: BoxDecoration(
-                    color: context.colors.surface,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: TapRatingBar(
-                    label: 'Food',
-                    emoji: '🍔',
-                    value: _demoRating,
-                    onChanged: (v) => setState(() => _demoRating = v),
-                  ),
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+                      decoration: BoxDecoration(
+                        color: context.colors.surface,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: TapRatingBar(
+                        label: 'Food',
+                        emoji: '🍔',
+                        value: _demoRating,
+                        onChanged: (v) => setState(() => _demoRating = v),
+                      ),
+                    ),
+                    // A playful "Try it!" bubble perched on the card.
+                    Positioned(
+                      top: -14,
+                      right: 10,
+                      child: Transform.rotate(
+                        angle: 0.06,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFC24B),
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: [
+                              BoxShadow(
+                                color:
+                                    Colors.black.withValues(alpha: 0.18),
+                                blurRadius: 8,
+                                offset: const Offset(0, 3),
+                              ),
+                            ],
+                          ),
+                          child: const Text('Try it! 👇',
+                              style: TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w900,
+                                  color: Color(0xFF4A3B32))),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
