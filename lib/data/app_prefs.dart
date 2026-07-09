@@ -32,6 +32,9 @@ class AppPrefs {
     notifFriendsFilter.value = p.getString(_notifFilterKey) ?? '';
     notifSocial.value = p.getBool(_notifSocialKey) ?? true;
     notifPlans.value = p.getBool(_notifPlansKey) ?? true;
+    emailNotifs.value = p.getBool(_emailNotifsKey) ?? true;
+    calendarProvider.value = p.getString(_calendarKey) ?? '';
+    a2hsSeen.value = p.getBool(_a2hsKey) ?? false;
     wrappedLastShown.value = p.getString(_wrappedKey) ?? '';
     themeAccent.value = p.getInt(_themeAccentKey) ?? 0;
   }
@@ -94,6 +97,40 @@ class AppPrefs {
     notifPlans.value = b;
     final p = await SharedPreferences.getInstance();
     await p.setBool(_notifPlansKey, b);
+  }
+
+  static const _emailNotifsKey = 'email_notifs';
+  static const _calendarKey = 'calendar_provider';
+  static const _a2hsKey = 'a2hs_seen';
+
+  /// Let friends' apps email me about requests and plans (stored on my
+  /// profile doc so senders can check it).
+  static final ValueNotifier<bool> emailNotifs = ValueNotifier<bool>(true);
+
+  /// Preferred calendar for "Add to my calendar": '' (ask on first use),
+  /// 'google', or 'apple'.
+  static final ValueNotifier<String> calendarProvider =
+      ValueNotifier<String>('');
+
+  /// Whether the web "add to home screen" page has been shown.
+  static final ValueNotifier<bool> a2hsSeen = ValueNotifier<bool>(false);
+
+  static Future<void> setEmailNotifs(bool b) async {
+    emailNotifs.value = b;
+    final p = await SharedPreferences.getInstance();
+    await p.setBool(_emailNotifsKey, b);
+  }
+
+  static Future<void> setCalendarProvider(String v) async {
+    calendarProvider.value = v;
+    final p = await SharedPreferences.getInstance();
+    await p.setString(_calendarKey, v);
+  }
+
+  static Future<void> setA2hsSeen(bool b) async {
+    a2hsSeen.value = b;
+    final p = await SharedPreferences.getInstance();
+    await p.setBool(_a2hsKey, b);
   }
 
   /// JSON: {"mode":"all"|"groups"|"friends","ids":[...]} — empty = everyone.

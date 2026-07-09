@@ -1,4 +1,5 @@
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
 import 'data/app_prefs.dart';
@@ -13,9 +14,11 @@ import 'data/plan_store.dart';
 import 'data/rating_bars_store.dart';
 import 'firebase_options.dart';
 import 'models/user_profile.dart';
+import 'screens/add_home_screen_page.dart';
 import 'screens/main_scaffold.dart';
 import 'screens/profile_setup_screen.dart';
 import 'screens/welcome_screen.dart';
+import 'services/web_bridge/web_bridge.dart' as web;
 import 'theme/app_theme.dart';
 import 'theme/theme_controller.dart';
 
@@ -119,17 +122,28 @@ class _RestaurantTrackerAppState extends State<RestaurantTrackerApp>
                   return ValueListenableBuilder<bool>(
                     valueListenable: AppPrefs.localMode,
                     builder: (context, localMode, _) {
-                      final Widget screen;
-                      if (needsSetup) {
-                        screen = const ProfileSetupScreen();
-                      } else if (user != null || localMode) {
-                        screen = const MainScaffold();
-                      } else {
-                        screen = const WelcomeScreen();
-                      }
-                      return AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 350),
-                        child: screen,
+                      return ValueListenableBuilder<bool>(
+                        valueListenable: AppPrefs.a2hsSeen,
+                        builder: (context, a2hsSeen, _) {
+                          final Widget screen;
+                          if (needsSetup) {
+                            screen = const ProfileSetupScreen();
+                          } else if (user != null || localMode) {
+                            // Web only, once: nudge to add YUMS to the
+                            // home screen (skip if already installed).
+                            screen = kIsWeb &&
+                                    !a2hsSeen &&
+                                    !web.isStandalonePwa()
+                                ? const AddHomeScreenPage()
+                                : const MainScaffold();
+                          } else {
+                            screen = const WelcomeScreen();
+                          }
+                          return AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 350),
+                            child: screen,
+                          );
+                        },
                       );
                     },
                   );

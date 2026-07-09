@@ -162,6 +162,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(error ?? 'Your account has been deleted. 👋')));
+    // Back to the root so the welcome screen shows.
+    Navigator.of(context).popUntil((r) => r.isFirst);
   }
 
   @override
@@ -270,9 +272,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
               _Tile(
                 icon: Icons.logout,
                 label: 'Sign out',
-                onTap: () => FirebaseAuthService.isCloudSignedIn
-                    ? FirebaseAuthService.signOut()
-                    : AuthService.signOut(),
+                onTap: () async {
+                  FirebaseAuthService.isCloudSignedIn
+                      ? await FirebaseAuthService.signOut()
+                      : await AuthService.signOut();
+                  // Pop back to the root so the welcome screen shows,
+                  // instead of this (now signed-out) profile page.
+                  if (context.mounted) {
+                    Navigator.of(context).popUntil((r) => r.isFirst);
+                  }
+                },
               ),
               _Tile(
                 icon: Icons.delete_forever_outlined,

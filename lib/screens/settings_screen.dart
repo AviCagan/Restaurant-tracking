@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/app_prefs.dart';
 import '../data/auth_service.dart';
 import '../data/firebase_services.dart';
+import '../services/calendar_service.dart';
 import '../theme/app_theme.dart';
 import '../theme/theme_controller.dart';
 import '../widgets/gradient_app_bar.dart';
@@ -62,6 +63,34 @@ class SettingsScreen extends StatelessWidget {
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const CustomizeScreen()),
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          const _SectionLabel('Calendar'),
+          ValueListenableBuilder<String>(
+            valueListenable: AppPrefs.calendarProvider,
+            builder: (context, provider, _) => Container(
+              decoration: BoxDecoration(
+                color: colors.surface,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: colors.line),
+              ),
+              child: ListTile(
+                leading: Icon(Icons.event_outlined, color: AppTheme.accent),
+                title: const Text('Calendar app',
+                    style: TextStyle(fontWeight: FontWeight.w700)),
+                subtitle: Text(
+                    '"Add to calendar" uses ${CalendarService.labelFor(provider)}',
+                    style: TextStyle(color: colors.subtle, fontSize: 12)),
+                trailing: Icon(Icons.chevron_right, color: colors.subtle),
+                onTap: () async {
+                  final choice = await CalendarService.showChooser(context,
+                      firstTime: false);
+                  if (choice != null) {
+                    await AppPrefs.setCalendarProvider(choice);
+                  }
+                },
               ),
             ),
           ),
@@ -147,9 +176,16 @@ class SettingsScreen extends StatelessWidget {
                         leading: const Icon(Icons.logout),
                         title: const Text('Sign out'),
                         subtitle: Text('@${user.username}'),
-                        onTap: () => FirebaseAuthService.isCloudSignedIn
-                            ? FirebaseAuthService.signOut()
-                            : AuthService.signOut(),
+                        onTap: () async {
+                          FirebaseAuthService.isCloudSignedIn
+                              ? await FirebaseAuthService.signOut()
+                              : await AuthService.signOut();
+                          // Back to the root so the welcome screen shows.
+                          if (context.mounted) {
+                            Navigator.of(context)
+                                .popUntil((r) => r.isFirst);
+                          }
+                        },
                       ),
               );
             },

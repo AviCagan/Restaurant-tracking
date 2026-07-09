@@ -22,4 +22,23 @@ class AppConfig {
   /// "Web SDK configuration". Empty = fall back to the browser redirect flow.
   static const String googleWebClientId =
       '16020027451-jdh3n8fra7ev1m9h5i6teu3mcnujsr3h.apps.googleusercontent.com';
+
+  // ---- Email notifications (EmailJS) ----
+  // EmailJS (emailjs.com) sends emails straight from the app on both web
+  // and Android — no server needed. One-time setup:
+  //   1. Create a free EmailJS account and connect the YUMS Gmail under
+  //      "Email Services" (copy the Service ID).
+  //   2. Create a template with fields {{to_email}} (To Email), {{subject}}
+  //      (Subject), and {{message}} in the body (copy the Template ID).
+  //   3. Account → General: copy the Public Key, and enable
+  //      "Allow EmailJS API for non-browser applications".
+  // All three values are public identifiers — safe to paste here.
+  static const String emailJsServiceId = '';
+  static const String emailJsTemplateId = '';
+  static const String emailJsPublicKey = '';
+
+  static bool get hasEmail =>
+      emailJsServiceId.isNotEmpty &&
+      emailJsTemplateId.isNotEmpty &&
+      emailJsPublicKey.isNotEmpty;
 }

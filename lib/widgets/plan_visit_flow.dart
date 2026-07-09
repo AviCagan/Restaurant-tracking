@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../data/friend_group_store.dart';
 import '../data/plan_store.dart';
 import '../data/social_service.dart';
+import '../services/calendar_service.dart';
 import '../services/notification_service.dart';
 import '../theme/app_theme.dart';
 import 'group_sheets.dart';
@@ -229,12 +229,9 @@ Future<bool> showPlanVisitFlow(
         'Don\'t forget to rate your visit while it\'s fresh!',
         baseId + 1);
   }
-  // Calendar.
-  if (addToCalendar) {
-    final uri = googleCalendarUrl(plan);
-    try {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } catch (_) {}
+  // Calendar — Google or Apple, first pick remembered.
+  if (addToCalendar && context.mounted) {
+    await CalendarService.addToCalendar(context, plan);
   }
   if (context.mounted) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(

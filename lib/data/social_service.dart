@@ -117,9 +117,10 @@ class SocialService {
   static Future<void> Function(Plan plan)? cloudCancelPlan;
 
   /// Set by the cloud layer: RSVP directly to a plan owner (used to back
-  /// out of a plan I previously joined).
-  static Future<void> Function(String ownerUid, String planId, bool going)?
-      cloudSendReply;
+  /// out of a plan I previously joined). Restaurant name + time are for
+  /// the notification email.
+  static Future<void> Function(String ownerUid, String planId, bool going,
+      String restaurantName, DateTime? when)? cloudSendReply;
 
   /// Set by the cloud layer: re-fetch every friend's categories (and
   /// auto-link matching ones).

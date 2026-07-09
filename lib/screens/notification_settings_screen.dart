@@ -88,6 +88,23 @@ class NotificationSettingsScreen extends StatelessWidget {
               'Invites from friends, and who\'s in / who can\'t make it',
             ),
           ),
+          const SizedBox(height: 24),
+          const _SectionLabel('Email'),
+          Container(
+            decoration: BoxDecoration(
+              color: colors.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: colors.line),
+            ),
+            child: _toggle(
+              colors,
+              AppPrefs.emailNotifs,
+              AppPrefs.setEmailNotifs,
+              'Email notifications',
+              'Requests, invites & RSVPs land in your inbox too — great '
+                  'for the iPhone/web version',
+            ),
+          ),
           const SizedBox(height: 16),
           Text(
             'Plan reminders ("2 hours before" / "rate it after") are chosen '

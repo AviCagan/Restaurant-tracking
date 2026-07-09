@@ -14,6 +14,7 @@ import '../config.dart';
 import '../models/category.dart';
 import '../models/restaurant.dart';
 import '../models/user_profile.dart';
+import '../services/email_service.dart';
 import '../services/notification_service.dart';
 import 'app_prefs.dart';
 import 'auth_service.dart';
@@ -157,6 +158,8 @@ class FirebaseAuthService {
       'name': profile.name,
       'username': profile.username,
       'bio': '',
+      'email': user.email ?? '',
+      'emailNotifs': AppPrefs.emailNotifs.value,
       'categoriesViewable': AppPrefs.categoriesViewable.value,
       'defaultVisibility': AppPrefs.defaultVisibility.value,
       'createdAt': FieldValue.serverTimestamp(),
@@ -184,6 +187,12 @@ class FirebaseAuthService {
     AuthService.onProfileChanged = null;
     await AuthService.updateProfile(profile);
     AuthService.onProfileChanged = _pushProfile;
+    // Backfill the email for accounts created before email notifications.
+    if ((d['email'] as String? ?? '').isEmpty &&
+        (user.email ?? '').isNotEmpty) {
+      _db.collection('users').doc(user.uid).set(
+          {'email': user.email}, SetOptions(merge: true)).catchError((_) {});
+    }
     return profile;
   }
 
@@ -767,6 +776,11 @@ class _CloudSocial {
       'username': me.username,
       'sentAt': FieldValue.serverTimestamp(),
     });
+    _emailUser(
+        targetUid,
+        'New friend request on YUMS 👋',
+        '${me.name} (@${me.username}) wants to be friends on YUMS! '
+            'Open the app to accept.');
     return true;
   }
 
@@ -774,6 +788,25 @@ class _CloudSocial {
     final snap =
         await _db.collection('usernames').doc(username.toLowerCase()).get();
     return snap.exists ? snap.data()!['uid'] as String : null;
+  }
+
+  /// Best-effort notification email to [uid], respecting their
+  /// emailNotifs preference. Never throws.
+  static Future<void> _emailUser(
+      String uid, String subject, String message) async {
+    try {
+      final doc = await _db.collection('users').doc(uid).get();
+      final d = doc.data() ?? {};
+      if (d['emailNotifs'] == false) return;
+      await EmailService.send(
+        toEmail: d['email'] as String? ?? '',
+        toName: d['name'] as String? ?? 'foodie',
+        subject: subject,
+        message: message,
+      );
+    } catch (e) {
+      debugPrint('email skipped: $e');
+    }
   }
 
   static Future<void> _accept(Friend f) async {
@@ -795,6 +828,11 @@ class _CloudSocial {
     batch.delete(_db.collection('users').doc(uid)
         .collection('friendRequests').doc(fromUid));
     await batch.commit();
+    _emailUser(
+        fromUid,
+        '${me.name} accepted your friend request 🎉',
+        'You\'re now friends on YUMS — open the app to check out '
+            '${me.name.split(' ').first}\'s eats!');
   }
 
   static Future<void> _decline(Friend f) async {
@@ -827,12 +865,20 @@ class _CloudSocial {
         'when': plan.when.millisecondsSinceEpoch,
         'sentAt': FieldValue.serverTimestamp(),
       });
+      _emailUser(
+          targetUid,
+          '${me.name} invited you to ${plan.restaurantName}! 🍽️',
+          '${DateFormat.MMMMEEEEd().add_jm().format(plan.when)} at '
+              '${plan.restaurantName}'
+              '${plan.address.isEmpty ? '' : ' (${plan.address})'}. '
+              'Open YUMS to say if you\'re in!');
     } catch (_) {}
   }
 
   /// RSVP straight to a plan owner's inbox (true = going).
-  static Future<void> _sendReply(
-      String ownerUid, String planId, bool going) async {
+  /// [restaurantName]/[when] are only used for the notification email.
+  static Future<void> _sendReply(String ownerUid, String planId, bool going,
+      String restaurantName, DateTime? when) async {
     final uid = _uid;
     final me = AuthService.user.value;
     if (uid == null || me == null) return;
@@ -849,6 +895,16 @@ class _CloudSocial {
         'going': going,
         'sentAt': FieldValue.serverTimestamp(),
       });
+      final where = restaurantName.isEmpty ? 'your plan' : restaurantName;
+      _emailUser(
+          ownerUid,
+          going
+              ? '${me.name} is in for $where! 🙌'
+              : '${me.name} can\'t make $where 😢',
+          when == null
+              ? 'Open YUMS to see who\'s coming.'
+              : '${DateFormat.MMMMEEEEd().add_jm().format(when)} — open YUMS '
+                  'to see who\'s coming.');
     } catch (e) {
       debugPrint('plan reply failed: $e');
     }
@@ -859,7 +915,8 @@ class _CloudSocial {
   static Future<void> _respondInvite(PlanInvite invite, bool going) async {
     final uid = _uid;
     if (uid == null) return;
-    await _sendReply(invite.fromUid, invite.planId, going);
+    await _sendReply(invite.fromUid, invite.planId, going,
+        invite.restaurantName, invite.when);
     try {
       await _db.collection('users').doc(uid)
           .collection('planInvites').doc(invite.id).delete();
@@ -902,6 +959,11 @@ class _CloudSocial {
           'cancelled': true,
           'sentAt': FieldValue.serverTimestamp(),
         });
+        _emailUser(
+            targetUid,
+            '${plan.restaurantName} is cancelled 😢',
+            '${me.name} called off the '
+                '${DateFormat.MMMMEEEEd().add_jm().format(plan.when)} plan.');
       } catch (e) {
         debugPrint('cancel push to $username failed: $e');
       }
@@ -966,6 +1028,7 @@ class _CloudSync {
     };
     AppPrefs.categoriesViewable.addListener(_pushPrefs);
     AppPrefs.defaultVisibility.addListener(_pushPrefs);
+    AppPrefs.emailNotifs.addListener(_pushPrefs);
     _initialPush();
   }
 
@@ -976,6 +1039,7 @@ class _CloudSync {
     CategoryStore.onChanged = null;
     AppPrefs.categoriesViewable.removeListener(_pushPrefs);
     AppPrefs.defaultVisibility.removeListener(_pushPrefs);
+    AppPrefs.emailNotifs.removeListener(_pushPrefs);
   }
 
   static Future<void> _initialPush() async {
@@ -1063,6 +1127,7 @@ class _CloudSync {
       await _db.collection('users').doc(uid).set({
         'categoriesViewable': AppPrefs.categoriesViewable.value,
         'defaultVisibility': AppPrefs.defaultVisibility.value,
+        'emailNotifs': AppPrefs.emailNotifs.value,
       }, SetOptions(merge: true));
     } catch (_) {}
     // The mirrored categories list follows the privacy toggle.

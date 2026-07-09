@@ -284,7 +284,8 @@ class _UpcomingPlans extends StatelessWidget {
         ),
       );
       if (out != true) return;
-      await SocialService.cloudSendReply?.call(p.ownerUid, p.id, false);
+      await SocialService.cloudSendReply
+          ?.call(p.ownerUid, p.id, false, p.restaurantName, p.when);
       cancelReminders();
       await PlanStore.delete(p.id);
       return;

@@ -26,6 +26,38 @@
 
   <title>YUMS</title>
   <link rel="manifest" href="manifest.json">
+
+  <!-- Helpers the Flutter app calls (see lib/services/web_bridge/). -->
+  <script>
+    let yumsDeferredPrompt = null;
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      yumsDeferredPrompt = e;
+    });
+    window.yumsCanInstall = () => yumsDeferredPrompt != null;
+    window.yumsInstall = async () => {
+      if (!yumsDeferredPrompt) return false;
+      yumsDeferredPrompt.prompt();
+      const choice = await yumsDeferredPrompt.userChoice;
+      yumsDeferredPrompt = null;
+      return choice.outcome === 'accepted';
+    };
+    window.yumsIsIos = () => /iphone|ipad|ipod/i.test(navigator.userAgent);
+    window.yumsIsStandalone = () =>
+      window.matchMedia('(display-mode: standalone)').matches ||
+      window.navigator.standalone === true;
+    window.yumsSaveIcs = (content, filename) => {
+      const blob = new Blob([content], { type: 'text/calendar' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+    };
+  </script>
 </head>
 <body>
   <script src="flutter_bootstrap.js" async></script>
