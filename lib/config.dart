@@ -1,15 +1,12 @@
 /// App-wide configuration.
-///
-/// The Google Maps / Places API key is read at build time from a
-/// `--dart-define`, so it never has to be committed to git.
-///
-/// Run the app like this:
-///   flutter run --dart-define=GOOGLE_MAPS_API_KEY=YOUR_KEY_HERE
-///
-/// (or add it to a launch config in your IDE).
 class AppConfig {
-  static const String googleMapsApiKey =
-      String.fromEnvironment('GOOGLE_MAPS_API_KEY', defaultValue: '');
+  /// Google Maps / Places key. Client keys are public identifiers (this
+  /// same key ships in web/index.html and the Android manifest); restrict
+  /// it by app/domain in the Google Cloud console. A `--dart-define` can
+  /// still override it, but plain `flutter build` now just works.
+  static const String googleMapsApiKey = String.fromEnvironment(
+      'GOOGLE_MAPS_API_KEY',
+      defaultValue: 'AIzaSyDxz50GD0TCXHmP61WJf7hsxBHWADXP0sw');
 
   /// Whether Google Places features (address autocomplete + auto photos)
   /// are available. If no key is supplied the app still works — you just
