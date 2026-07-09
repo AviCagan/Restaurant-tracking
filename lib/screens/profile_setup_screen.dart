@@ -144,7 +144,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     }
   }
 
-  Widget _categoryChip(AppCategory c) {
+  Widget _categoryCard(AppCategory c) {
     final colors = context.colors;
     final on = _picked.contains(c.key);
     return GestureDetector(
@@ -153,27 +153,87 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         setState(() => on ? _picked.remove(c.key) : _picked.add(c.key));
       },
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 120),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+        duration: const Duration(milliseconds: 150),
+        curve: Curves.easeOut,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
         decoration: BoxDecoration(
-          color: on ? AppTheme.accent : colors.surface,
-          borderRadius: BorderRadius.circular(30),
-          border: Border.all(color: on ? AppTheme.accent : colors.line),
+          color: on
+              ? AppTheme.accent.withValues(alpha: 0.14)
+              : colors.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+              color: on ? AppTheme.accent : colors.line,
+              width: on ? 2 : 1),
         ),
         child: Row(
-          mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(c.icon, size: 16, color: on ? Colors.white : colors.subtle),
-            const SizedBox(width: 6),
-            Text(c.label,
-                style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: on ? Colors.white : colors.ink)),
-            if (on) ...[
-              const SizedBox(width: 5),
-              const Icon(Icons.check, size: 14, color: Colors.white),
-            ],
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: on
+                    ? AppTheme.accent
+                    : AppTheme.accent.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(c.icon,
+                  size: 20, color: on ? Colors.white : AppTheme.accent),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(c.label,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                      fontSize: 13.5,
+                      height: 1.15,
+                      fontWeight: FontWeight.w800,
+                      color: on ? AppTheme.accentDark : colors.ink)),
+            ),
+            AnimatedScale(
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOutBack,
+              scale: on ? 1 : 0,
+              child: Icon(Icons.check_circle,
+                  size: 20, color: AppTheme.accent),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _addYourOwnCard() {
+    final colors = context.colors;
+    return GestureDetector(
+      onTap: _addCustom,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        decoration: BoxDecoration(
+          color: colors.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppTheme.accent, width: 1.4),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: AppTheme.accent.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(Icons.add, size: 22, color: AppTheme.accent),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text('Your own…',
+                  style: TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w800,
+                      color: AppTheme.accent)),
+            ),
           ],
         ),
       ),
@@ -234,46 +294,48 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                   ),
                 ),
                 const SizedBox(height: 24),
-                Text('Pick your categories',
-                    style: AppTheme.heading(16, color: colors.ink)),
-                const SizedBox(height: 4),
-                Text(
-                    'Tap the ones you want from the examples — only those '
-                    'get added. Make your own too!',
-                    style: TextStyle(fontSize: 12, color: colors.subtle)),
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
+                Row(
                   children: [
-                    ...defaultCategories.map(_categoryChip),
-                    ..._custom.map(_categoryChip),
-                    // Create one right here.
-                    GestureDetector(
-                      onTap: _addCustom,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 9),
-                        decoration: BoxDecoration(
-                          color: colors.surface,
-                          borderRadius: BorderRadius.circular(30),
-                          border: Border.all(color: AppTheme.accent),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.add,
-                                size: 16, color: AppTheme.accent),
-                            const SizedBox(width: 6),
-                            Text('Your own',
-                                style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppTheme.accent)),
-                          ],
-                        ),
-                      ),
+                    Text('Pick your categories',
+                        style: AppTheme.heading(16, color: colors.ink)),
+                    const Spacer(),
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 180),
+                      child: _picked.isEmpty
+                          ? const SizedBox.shrink()
+                          : Container(
+                              key: ValueKey(_picked.length),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color:
+                                    AppTheme.accent.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text('${_picked.length} picked',
+                                  style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppTheme.accentDark)),
+                            ),
                     ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text('Tap what you eat — only those get added.',
+                    style: TextStyle(fontSize: 12, color: colors.subtle)),
+                const SizedBox(height: 12),
+                GridView.count(
+                  crossAxisCount: 2,
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  mainAxisSpacing: 10,
+                  crossAxisSpacing: 10,
+                  childAspectRatio: 2.7,
+                  children: [
+                    ...defaultCategories.map(_categoryCard),
+                    ..._custom.map(_categoryCard),
+                    _addYourOwnCard(),
                   ],
                 ),
                 const SizedBox(height: 12),

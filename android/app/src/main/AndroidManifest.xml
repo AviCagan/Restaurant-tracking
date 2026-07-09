@@ -11,14 +11,19 @@
     <!-- Reminders & friend-rating notifications. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
 
+    <!-- allowBackup=false: without it, Android silently restores old app
+         data (groups, prefs, "tour seen") when the app is reinstalled —
+         fresh installs must actually be fresh. -->
     <application
         android:label="YUMS"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
-        <!-- Google Maps SDK key (restricted to this app's package + SHA-1). -->
+        android:icon="@mipmap/ic_launcher"
+        android:allowBackup="false"
+        android:fullBackupContent="false">
+        <!-- Google Maps SDK key. -->
         <meta-data
             android:name="com.google.android.geo.API_KEY"
-            android:value="AIzaSyBaLP8dTdtoPdiHe8BFIxXKogM3vLsSG2U"/>
+            android:value="AIzaSyDxz50GD0TCXHmP61WJf7hsxBHWADXP0sw"/>
         <activity
             android:name=".MainActivity"
             android:exported="true"
