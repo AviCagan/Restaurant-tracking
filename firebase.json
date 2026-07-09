@@ -1,6 +1,6 @@
 {
   "hosting": {
-    "site": "yums-food",
+    "site": "yums",
     "public": "build/web",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "rewrites": [
