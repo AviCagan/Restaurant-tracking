@@ -4,7 +4,8 @@ import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb;
-import 'package:flutter/foundation.dart' show ValueNotifier, debugPrint;
+import 'package:flutter/foundation.dart'
+    show ValueNotifier, debugPrint, kIsWeb;
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:intl/intl.dart';
@@ -87,7 +88,12 @@ class FirebaseAuthService {
   /// is configured.
   static Future<UserProfile?> signInWithGoogle() async {
     fb.User? user;
-    if (AppConfig.googleWebClientId.isNotEmpty) {
+    if (kIsWeb) {
+      // Browsers use Firebase's own popup flow — no plugin config needed.
+      final cred = await fb.FirebaseAuth.instance
+          .signInWithPopup(fb.GoogleAuthProvider());
+      user = cred.user;
+    } else if (AppConfig.googleWebClientId.isNotEmpty) {
       final googleUser = await GoogleSignIn(
               serverClientId: AppConfig.googleWebClientId)
           .signIn();
@@ -222,7 +228,15 @@ class FirebaseAuthService {
     // Re-authenticate FIRST. Firebase refuses account deletion on a stale
     // session (requires-recent-login); doing it up front means we can't end
     // up wiping the data and then failing to remove the sign-in.
-    if (AppConfig.googleWebClientId.isNotEmpty) {
+    if (kIsWeb) {
+      try {
+        await user.reauthenticateWithPopup(fb.GoogleAuthProvider());
+      } catch (e) {
+        debugPrint('reauth for deletion failed: $e');
+        return 'Couldn\'t verify it\'s you — check your connection and '
+            'try again.';
+      }
+    } else if (AppConfig.googleWebClientId.isNotEmpty) {
       try {
         final googleUser = await GoogleSignIn(
                 serverClientId: AppConfig.googleWebClientId)

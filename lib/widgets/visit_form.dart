@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
@@ -141,6 +142,12 @@ class VisitFormState extends State<VisitForm> {
   }
 
   Future<void> _addPhotos() async {
+    if (kIsWeb) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Photo uploads aren\'t on the web version yet — '
+              'use the Android app for pics!')));
+      return;
+    }
     final remaining = _maxPhotos - _photoPaths.length;
     if (remaining <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(

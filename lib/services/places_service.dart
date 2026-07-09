@@ -79,7 +79,17 @@ class PlacesService {
 
   Future<List<PlacePrediction>> autocomplete(String input) async {
     if (!enabled || input.trim().isEmpty) return [];
+    try {
+      return await _autocomplete(input);
+    } catch (e) {
+      // Network/CORS hiccup — degrade to manual entry.
+      // ignore: avoid_print
+      print('Places autocomplete error: $e');
+      return [];
+    }
+  }
 
+  Future<List<PlacePrediction>> _autocomplete(String input) async {
     final uri = Uri.parse('$_base/places:autocomplete');
     final reqBody = <String, dynamic>{
       'input': input,
@@ -138,7 +148,16 @@ class PlacesService {
 
   Future<PlaceDetails?> details(String placeId) async {
     if (!enabled || placeId.isEmpty) return null;
+    try {
+      return await _details(placeId);
+    } catch (e) {
+      // ignore: avoid_print
+      print('Places details error: $e');
+      return null;
+    }
+  }
 
+  Future<PlaceDetails?> _details(String placeId) async {
     final uri = Uri.parse('$_base/places/$placeId').replace(
       queryParameters: {'sessionToken': _sessionToken},
     );

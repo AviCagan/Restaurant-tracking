@@ -1,12 +1,16 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:path/path.dart' as p;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 
 import '../models/restaurant.dart';
 
-/// Local SQLite store for restaurants + their visits.
+/// Local store for restaurants + their visits. SQLite on Android/iOS; on
+/// the web (no SQLite in browsers) the same data lives as one JSON blob in
+/// browser storage — personal lists are small, so this is plenty.
 class RestaurantDatabase {
   RestaurantDatabase._();
   static final RestaurantDatabase instance = RestaurantDatabase._();
@@ -18,6 +22,29 @@ class RestaurantDatabase {
   Database? _db;
 
   Future<Database> get _database async => _db ??= await _open();
+
+  // ---- Web storage (browser) ----
+  static const _webKey = 'restaurants_web_v1';
+  List<Restaurant>? _webCache;
+
+  Future<List<Restaurant>> _webAll() async {
+    if (_webCache != null) return _webCache!;
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_webKey);
+    _webCache = raw == null || raw.isEmpty
+        ? <Restaurant>[]
+        : [
+            for (final m in jsonDecode(raw) as List)
+              Restaurant.fromMap((m as Map).cast<String, dynamic>())
+          ];
+    return _webCache!;
+  }
+
+  Future<void> _webSave() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_webKey,
+        jsonEncode([for (final r in _webCache ?? <Restaurant>[]) r.toMap()]));
+  }
 
   Future<Database> _open() async {
     final dir = await getDatabasesPath();
@@ -104,12 +131,23 @@ class RestaurantDatabase {
   }
 
   Future<List<Restaurant>> getAll() async {
+    if (kIsWeb) {
+      final all = await _webAll();
+      return [...all]..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    }
     final db = await _database;
     final rows = await db.query(_table, orderBy: 'createdAt DESC');
     return rows.map(Restaurant.fromMap).toList();
   }
 
   Future<Restaurant?> getById(String id) async {
+    if (kIsWeb) {
+      final all = await _webAll();
+      for (final r in all) {
+        if (r.id == id) return r;
+      }
+      return null;
+    }
     final db = await _database;
     final rows = await db.query(_table, where: 'id = ?', whereArgs: [id]);
     if (rows.isEmpty) return null;
@@ -121,6 +159,14 @@ class RestaurantDatabase {
   static void Function(String id)? onDelete;
 
   Future<void> upsert(Restaurant r) async {
+    if (kIsWeb) {
+      final all = await _webAll();
+      final i = all.indexWhere((x) => x.id == r.id);
+      i >= 0 ? all[i] = r : all.add(r);
+      await _webSave();
+      onUpsert?.call(r);
+      return;
+    }
     final db = await _database;
     await db.insert(
       _table,
@@ -131,6 +177,13 @@ class RestaurantDatabase {
   }
 
   Future<void> delete(String id) async {
+    if (kIsWeb) {
+      final all = await _webAll();
+      all.removeWhere((r) => r.id == id);
+      await _webSave();
+      onDelete?.call(id);
+      return;
+    }
     final db = await _database;
     await db.delete(_table, where: 'id = ?', whereArgs: [id]);
     onDelete?.call(id);

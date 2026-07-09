@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:uuid/uuid.dart';
@@ -330,30 +331,33 @@ class _AddRestaurantScreenState extends State<AddRestaurantScreen> {
                 const SizedBox(height: 8),
                 Divider(height: 1, color: colors.line),
               ],
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 2),
-                child: Text('Add your own',
-                    style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800,
-                        color: colors.subtle)),
-              ),
-              ListTile(
-                leading: Icon(Icons.photo_camera_outlined,
-                    color: AppTheme.accent),
-                title: const Text('Take a photo',
-                    style: TextStyle(fontWeight: FontWeight.w700)),
-                onTap: () =>
-                    Navigator.pop(sheetContext, ImageSource.camera),
-              ),
-              ListTile(
-                leading: Icon(Icons.photo_library_outlined,
-                    color: AppTheme.accent),
-                title: const Text('Choose from library',
-                    style: TextStyle(fontWeight: FontWeight.w700)),
-                onTap: () =>
-                    Navigator.pop(sheetContext, ImageSource.gallery),
-              ),
+              // Own photos need the filesystem — Android/iOS only.
+              if (!kIsWeb) ...[
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 2),
+                  child: Text('Add your own',
+                      style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          color: colors.subtle)),
+                ),
+                ListTile(
+                  leading: Icon(Icons.photo_camera_outlined,
+                      color: AppTheme.accent),
+                  title: const Text('Take a photo',
+                      style: TextStyle(fontWeight: FontWeight.w700)),
+                  onTap: () =>
+                      Navigator.pop(sheetContext, ImageSource.camera),
+                ),
+                ListTile(
+                  leading: Icon(Icons.photo_library_outlined,
+                      color: AppTheme.accent),
+                  title: const Text('Choose from library',
+                      style: TextStyle(fontWeight: FontWeight.w700)),
+                  onTap: () =>
+                      Navigator.pop(sheetContext, ImageSource.gallery),
+                ),
+              ],
               const SizedBox(height: 8),
             ],
           ),

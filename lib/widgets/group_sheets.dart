@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -18,7 +19,9 @@ class GroupAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (group.photoPath.isNotEmpty && File(group.photoPath).existsSync()) {
+    if (!kIsWeb &&
+        group.photoPath.isNotEmpty &&
+        File(group.photoPath).existsSync()) {
       return ClipOval(
         child: Image.file(File(group.photoPath),
             width: size, height: size, fit: BoxFit.cover),
@@ -116,7 +119,9 @@ Future<bool> showGroupEditDialog(BuildContext context,
                             size: 20, color: AppTheme.accent),
                       ),
                     ),
-                    // Or a photo instead of an emoji.
+                    // Or a photo instead of an emoji (not on web — no
+                    // filesystem to keep it in).
+                    if (!kIsWeb)
                     GestureDetector(
                       onTap: () async {
                         final source = await PhotoSourceSheet.show(context);
