@@ -36,6 +36,13 @@ class CategoryStore {
     onChanged?.call();
   }
 
+  /// Replace the whole set — used by first-time setup where the user picks
+  /// which starter categories they actually want.
+  static Future<void> setAll(List<AppCategory> cats) async {
+    all.value = List.of(cats);
+    await _save();
+  }
+
   static Future<AppCategory> add(String label, {int iconIndex = 0}) async {
     final clean = label.trim();
     final key = 'custom_${DateTime.now().millisecondsSinceEpoch}';

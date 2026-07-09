@@ -906,7 +906,23 @@ class _CloudSocial {
   static Future<void> _removeFriend(Friend f) async {
     final uid = _uid;
     if (uid == null) return;
-    final otherUid = await _uidForUsername(f.username);
+    // Find their uid from the local cache and purge everything of theirs
+    // synchronously — reviews, pins and feed entries vanish immediately,
+    // before any network round-trip.
+    String? otherUid;
+    _friendByUid.forEach((k, v) {
+      if (v.username == f.username) otherUid = k;
+    });
+    if (otherUid != null) {
+      _restaurantSubs.remove(otherUid)?.cancel();
+      _profileSubs.remove(otherUid)?.cancel();
+      _friendRestaurants.remove(otherUid);
+      _friendByUid.remove(otherUid);
+      SocialService.cloudCategories.remove(f.name);
+      SocialService.friends.value = _friendByUid.values.toList();
+      _rebuildCaches();
+    }
+    otherUid ??= await _uidForUsername(f.username);
     if (otherUid == null) return;
     final batch = _db.batch();
     batch.delete(

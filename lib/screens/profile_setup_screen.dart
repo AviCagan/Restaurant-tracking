@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 
+import '../data/category_store.dart';
 import '../data/firebase_services.dart';
+import '../models/category.dart';
+import '../services/haptics.dart';
 import '../theme/app_theme.dart';
-import '../widgets/category_selector.dart';
 
-/// Quick first-time setup after Google sign-in: name, username, and a first
-/// pass over categories. Everything can be changed later.
+/// Quick first-time setup after Google sign-in: name, username, and picking
+/// which categories you want. Everything can be changed later.
 class ProfileSetupScreen extends StatefulWidget {
   const ProfileSetupScreen({super.key});
 
@@ -20,6 +22,12 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       TextEditingController(text: FirebaseAuthService.suggestedUsername());
   bool _busy = false;
 
+  /// Keys of the example categories the user tapped on.
+  final Set<String> _picked = {};
+
+  /// Categories the user created right here.
+  final List<AppCategory> _custom = [];
+
   @override
   void dispose() {
     _nameCtrl.dispose();
@@ -28,7 +36,19 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   }
 
   Future<void> _finish() async {
+    // Only keep what they actually chose (their own creations included).
+    final chosen = [
+      ...defaultCategories.where((c) => _picked.contains(c.key)),
+      ..._custom.where((c) => _picked.contains(c.key)),
+    ];
+    if (chosen.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content:
+              Text('Pick at least one category — you can change them later.')));
+      return;
+    }
     setState(() => _busy = true);
+    await CategoryStore.setAll(chosen);
     final error = await FirebaseAuthService.completeSetup(
         _nameCtrl.text, _userCtrl.text);
     if (!mounted) return;
@@ -38,6 +58,126 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           .showSnackBar(SnackBar(content: Text(error)));
     }
     // On success the app gate flips to MainScaffold automatically.
+  }
+
+  /// Create a category right here: name + icon.
+  Future<void> _addCustom() async {
+    final nameCtrl = TextEditingController();
+    var iconIndex = 0;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialog) => AlertDialog(
+          title: const Text('New category'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextField(
+                controller: nameCtrl,
+                autofocus: true,
+                textCapitalization: TextCapitalization.words,
+                decoration: const InputDecoration(hintText: 'e.g. Sushi'),
+              ),
+              const SizedBox(height: 14),
+              SizedBox(
+                height: 44,
+                width: double.maxFinite,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: categoryIcons.length - 1, // skip the chain icon
+                  separatorBuilder: (_, __) => const SizedBox(width: 6),
+                  itemBuilder: (_, i) {
+                    final on = i == iconIndex;
+                    return GestureDetector(
+                      onTap: () => setDialog(() => iconIndex = i),
+                      child: Container(
+                        width: 44,
+                        decoration: BoxDecoration(
+                          color: on
+                              ? AppTheme.accent.withValues(alpha: 0.18)
+                              : dialogContext.colors.background,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                              color: on
+                                  ? AppTheme.accent
+                                  : dialogContext.colors.line),
+                        ),
+                        child: Icon(categoryIcons[i],
+                            size: 20,
+                            color: on
+                                ? AppTheme.accent
+                                : dialogContext.colors.subtle),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('Cancel')),
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: AppTheme.accent),
+              onPressed: () {
+                if (nameCtrl.text.trim().isEmpty) return;
+                Navigator.pop(dialogContext, true);
+              },
+              child: const Text('Add'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (ok == true && nameCtrl.text.trim().isNotEmpty) {
+      final cat = AppCategory(
+        key: 'custom_${DateTime.now().millisecondsSinceEpoch}',
+        label: nameCtrl.text.trim(),
+        iconIndex: iconIndex,
+      );
+      setState(() {
+        _custom.add(cat);
+        _picked.add(cat.key); // you made it — obviously you want it
+      });
+    }
+  }
+
+  Widget _categoryChip(AppCategory c) {
+    final colors = context.colors;
+    final on = _picked.contains(c.key);
+    return GestureDetector(
+      onTap: () {
+        Haptics.tick();
+        setState(() => on ? _picked.remove(c.key) : _picked.add(c.key));
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 120),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+        decoration: BoxDecoration(
+          color: on ? AppTheme.accent : colors.surface,
+          borderRadius: BorderRadius.circular(30),
+          border: Border.all(color: on ? AppTheme.accent : colors.line),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(c.icon, size: 16, color: on ? Colors.white : colors.subtle),
+            const SizedBox(width: 6),
+            Text(c.label,
+                style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: on ? Colors.white : colors.ink)),
+            if (on) ...[
+              const SizedBox(width: 5),
+              const Icon(Icons.check, size: 14, color: Colors.white),
+            ],
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -94,18 +234,47 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                   ),
                 ),
                 const SizedBox(height: 24),
-                Text('Your categories',
+                Text('Pick your categories',
                     style: AppTheme.heading(16, color: colors.ink)),
                 const SizedBox(height: 4),
                 Text(
-                    'Here\'s a starter set — tap Add to make your own, '
-                    'long-press to remove.',
+                    'Tap the ones you want from the examples — only those '
+                    'get added. Make your own too!',
                     style: TextStyle(fontSize: 12, color: colors.subtle)),
                 const SizedBox(height: 10),
-                CategorySelector(
-                  selected: const {},
-                  editable: true,
-                  onChanged: (_) {},
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    ...defaultCategories.map(_categoryChip),
+                    ..._custom.map(_categoryChip),
+                    // Create one right here.
+                    GestureDetector(
+                      onTap: _addCustom,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 9),
+                        decoration: BoxDecoration(
+                          color: colors.surface,
+                          borderRadius: BorderRadius.circular(30),
+                          border: Border.all(color: AppTheme.accent),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.add,
+                                size: 16, color: AppTheme.accent),
+                            const SizedBox(width: 6),
+                            Text('Your own',
+                                style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppTheme.accent)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 12),
                 Container(
