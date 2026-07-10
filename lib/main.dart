@@ -39,8 +39,26 @@ Future<void> main() async {
   // Cloud layer — if Firebase isn't configured on this machine, the app
   // simply keeps running local-only.
   try {
-    await Firebase.initializeApp(
-        options: DefaultFirebaseOptions.currentPlatform);
+    var options = DefaultFirebaseOptions.currentPlatform;
+    // Web: point authDomain at the domain the app is actually served
+    // from. Firebase Hosting serves the /__/auth helpers on every one of
+    // its domains, and a SAME-origin auth flow is the documented fix for
+    // Safari 16.1+/iOS blocking third-party storage during sign-in.
+    // https://firebase.google.com/docs/auth/web/redirect-best-practices
+    final host = Uri.base.host;
+    if (kIsWeb && host.isNotEmpty && host != 'localhost') {
+      options = FirebaseOptions(
+        apiKey: options.apiKey,
+        appId: options.appId,
+        messagingSenderId: options.messagingSenderId,
+        projectId: options.projectId,
+        authDomain: host,
+        databaseURL: options.databaseURL,
+        storageBucket: options.storageBucket,
+        measurementId: options.measurementId,
+      );
+    }
+    await Firebase.initializeApp(options: options);
     CloudBoot.init();
   } catch (e) {
     debugPrint('Firebase unavailable, running local-only: $e');

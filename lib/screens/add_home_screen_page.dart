@@ -45,7 +45,10 @@ class AddHomeScreenPage extends StatelessWidget {
                         color: Colors.white, weight: FontWeight.w700)),
                 const SizedBox(height: 8),
                 Text(
-                  'Full screen, its own icon — just like a real app.',
+                  isIos
+                      ? 'One tap and you\'re in — always signed in, all '
+                          'your spots.'
+                      : 'Full screen, its own icon — just like a real app.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                       color: Colors.white.withValues(alpha: 0.92),

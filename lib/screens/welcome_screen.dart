@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../config.dart';
 import '../data/app_prefs.dart';
 import '../data/firebase_services.dart';
 import '../theme/app_theme.dart';
@@ -119,7 +120,16 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                       color: Colors.white.withValues(alpha: 0.85),
                       fontSize: 11.5),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 8),
+                Text(
+                  AppConfig.buildTag,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.5),
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 12),
               ],
             ),
           ),

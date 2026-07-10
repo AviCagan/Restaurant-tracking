@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../config.dart';
 import '../data/app_prefs.dart';
 import '../data/auth_service.dart';
 import '../data/firebase_services.dart';
@@ -226,7 +227,7 @@ class SettingsScreen extends StatelessWidget {
                 const ListTile(
                   leading: Icon(Icons.restaurant_menu),
                   title: Text('YUMS'),
-                  subtitle: Text('Alpha pre-release'),
+                  subtitle: Text('Alpha pre-release · ${AppConfig.buildTag}'),
                 ),
                 Divider(height: 1, color: colors.line),
                 ListTile(

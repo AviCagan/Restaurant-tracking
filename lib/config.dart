@@ -42,4 +42,8 @@ class AppConfig {
   /// Play Store link for the Android app. Empty until it's published —
   /// the web version then tells Android visitors to ask for the APK.
   static const String playStoreUrl = '';
+
+  /// Shown on the welcome screen + Settings → About, so "which build am I
+  /// actually running?" is answerable at a glance (browser caches lie).
+  static const String buildTag = 'v14';
 }
