@@ -68,9 +68,19 @@ class CloudBoot {
         // (e.g. the account was deleted or the session was revoked), clear
         // it — otherwise the app looks signed in while every social
         // feature silently runs in offline mode.
+        //
+        // BUT: on web the very first event can be a null fired while the
+        // session is still being restored from browser storage — clearing
+        // instantly would sign the user out on every page refresh. Give
+        // the restore a few seconds; only clear if still signed out.
         if (AuthService.user.value != null && !AppPrefs.localMode.value) {
-          debugPrint('clearing stale local profile (no Firebase session)');
-          await AuthService.signOut();
+          await Future.delayed(const Duration(seconds: 4));
+          if (fb.FirebaseAuth.instance.currentUser == null &&
+              AuthService.user.value != null &&
+              !AppPrefs.localMode.value) {
+            debugPrint('clearing stale local profile (no Firebase session)');
+            await AuthService.signOut();
+          }
         }
       }
     });
@@ -204,6 +214,7 @@ class FirebaseAuthService {
       'name': p.name,
       'username': p.username,
       'bio': p.bio,
+      'photo': p.photo,
     }, SetOptions(merge: true));
     // Best-effort username claim for the (possibly new) handle.
     try {
@@ -374,6 +385,10 @@ class _CloudSocial {
   static final Map<String, StreamSubscription> _restaurantSubs = {};
   static final Map<String, StreamSubscription> _profileSubs = {};
   static final Map<String, List<Restaurant>> _friendRestaurants = {};
+
+  /// Per friend: restaurantId -> normalized category labels (synced with
+  /// each restaurant; powers name-based category matching on the map).
+  static final Map<String, Map<String, List<String>>> _friendRestLabels = {};
   static final Map<String, Friend> _friendByUid = {};
 
   /// Friend uids whose acceptance *I* triggered — don't notify myself.
@@ -498,12 +513,18 @@ class _CloudSocial {
         .collection('users').doc(uid).collection('friends')
         .snapshots()
         .listen((snap) {
+      final old = Map.of(_friendByUid);
       _friendByUid.clear();
       for (final d in snap.docs) {
         final username = d.data()['username'] as String? ?? d.id;
         if (BlockStore.isBlocked(username)) continue; // stay hidden
+        // Keep the bio/photo the profile listener already fetched.
         _friendByUid[d.id] = Friend(
-            d.data()['name'] as String? ?? 'Friend', username);
+          d.data()['name'] as String? ?? 'Friend',
+          username,
+          bio: old[d.id]?.bio ?? '',
+          photo: old[d.id]?.photo ?? '',
+        );
       }
       SocialService.friends.value = _friendByUid.values.toList();
       // A new doc here that *I* didn't create means someone accepted my
@@ -579,6 +600,7 @@ class _CloudSocial {
     _restaurantSubs.clear();
     _profileSubs.clear();
     _friendRestaurants.clear();
+    _friendRestLabels.clear();
     _friendByUid.clear();
     _selfAccepted.clear();
     _uid = null;
@@ -591,6 +613,7 @@ class _CloudSocial {
         _restaurantSubs.remove(uid)?.cancel();
         _profileSubs.remove(uid)?.cancel();
         _friendRestaurants.remove(uid);
+        _friendRestLabels.remove(uid);
       }
     }
     // Add listeners for new friends.
@@ -606,6 +629,13 @@ class _CloudSocial {
           for (final d in snap.docs)
             if (_tryParse(d.data()) case final r?) r
         ];
+        _friendRestLabels[uid] = {
+          for (final d in snap.docs)
+            d.id: [
+              for (final l in (d.data()['categoryLabels'] as List? ?? []))
+                l.toString()
+            ]
+        };
         // Notify on newly shared ratings (not the initial load).
         if (!firstSnapshot) {
           final friend = _friendByUid[uid];
@@ -628,8 +658,8 @@ class _CloudSocial {
     _rebuildCaches();
   }
 
-  /// Parse a friend's categories array off their profile doc, cache it, and
-  /// auto-link same-named categories to mine.
+  /// A friend's profile doc changed: refresh their categories, bio, and
+  /// profile photo everywhere.
   static void _applyFriendCategories(
       String uid, Map<String, dynamic>? data) {
     final friend = _friendByUid[uid];
@@ -645,10 +675,17 @@ class _CloudSocial {
     ];
     SocialService.cloudCategories[friend.name] = cats;
     CategoryMapping.autoLink(cats, CategoryStore.all.value);
+    // Bio + photo ride along on the same doc.
+    _friendByUid[uid] = Friend(
+      data?['name'] as String? ?? friend.name,
+      friend.username,
+      bio: data?['bio'] as String? ?? '',
+      photo: data?['photo'] as String? ?? '',
+    );
     debugPrint('categories for ${friend.name}: ${cats.length} live, '
         '${CategoryMapping.map.value.length} total links');
-    // Nudge open screens (compare/map) to rebuild.
-    SocialService.friends.value = List.of(SocialService.friends.value);
+    // Nudge open screens (avatars/compare/map) to rebuild.
+    SocialService.friends.value = _friendByUid.values.toList();
   }
 
   static void _notifyNewRatings(
@@ -744,6 +781,7 @@ class _CloudSocial {
             lat: r.lat!,
             lng: r.lng!,
             categoryKeys: r.categoryKeys,
+            categoryLabels: _friendRestLabels[uid]?[r.id] ?? const [],
             visits: [visit],
           ));
         }
@@ -1045,6 +1083,7 @@ class _CloudSocial {
       _restaurantSubs.remove(otherUid)?.cancel();
       _profileSubs.remove(otherUid)?.cancel();
       _friendRestaurants.remove(otherUid);
+      _friendRestLabels.remove(otherUid);
       _friendByUid.remove(otherUid);
       SocialService.cloudCategories.remove(f.name);
       SocialService.friends.value = _friendByUid.values.toList();
@@ -1132,6 +1171,13 @@ class _CloudSync {
       map['visibility'] = r.visits.any((v) => v.visibility == 'friends')
           ? 'friends'
           : 'private';
+      // Denormalized, normalized category labels: friends match these by
+      // NAME ("chinese" == "Chinese 🥡") — no key-linking required.
+      map['categoryLabels'] = [
+        for (final k in r.categoryKeys)
+          if (CategoryStore.byKey(k) case final c?)
+            CategoryMapping.norm(c.label)
+      ];
       // Upload the cover once so friends can see it. Strictly best-effort:
       // if Storage isn't set up, the restaurant must still sync — a missing
       // photo is cosmetic, a missing doc means friends see nothing at all.

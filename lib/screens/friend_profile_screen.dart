@@ -14,6 +14,20 @@ class FriendProfileScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Track the live friend record so their bio/photo appear the moment
+    // they sync (the constructor copy may predate them).
+    return ValueListenableBuilder<List<Friend>>(
+      valueListenable: SocialService.friends,
+      builder: (context, allFriends, _) {
+        final friend = allFriends.firstWhere(
+            (f) => f.username == this.friend.username,
+            orElse: () => this.friend);
+        return _build(context, friend);
+      },
+    );
+  }
+
+  Widget _build(BuildContext context, Friend friend) {
     final colors = context.colors;
     final favorites = SocialService.favoritesFor(friend.name);
     final reviews = SocialService.reviewsFor(friend.name);
@@ -33,6 +47,18 @@ class FriendProfileScreen extends StatelessWidget {
                         fontSize: 22, fontWeight: FontWeight.w800)),
                 Text('@${friend.username}',
                     style: TextStyle(color: colors.subtle)),
+                if (friend.bio.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Text(friend.bio,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                            color: colors.ink,
+                            fontSize: 13.5,
+                            height: 1.35)),
+                  ),
+                ],
               ],
             ),
           ),

@@ -7,6 +7,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../data/category_mapping.dart';
+import '../data/category_store.dart';
 import '../data/filter_state.dart';
 import '../data/friend_group_store.dart';
 import '../data/restaurant_database.dart';
@@ -42,6 +43,10 @@ class _Pin {
   final double lat;
   final double lng;
   final List<String> categoryKeys;
+
+  /// Normalized labels from friends' synced restaurants — matching by
+  /// name needs no category linking at all.
+  final Set<String> categoryLabels = {};
   final List<_Rater> raters;
   _Pin(this.name, this.address, this.lat, this.lng, this.categoryKeys,
       this.raters);
@@ -144,6 +149,7 @@ class _MapScreenState extends State<MapScreen> {
     for (final mp in SocialService.mapPlaces()) {
       final p = acc(mp.name, mp.address, mp.lat, mp.lng);
       p.categoryKeys.addAll(mp.categoryKeys);
+      p.categoryLabels.addAll(mp.categoryLabels);
       for (final v in mp.visits) {
         p.raters.add(
             _Rater(v.friend.name, v.rating, v.review, false, price: v.price));
@@ -170,8 +176,20 @@ class _MapScreenState extends State<MapScreen> {
       }
       if (raters.isEmpty) continue;
       if (cats.isNotEmpty) {
+        // Match on keys (mine / manually linked)…
         final resolved = CategoryMapping.resolveAll(pin.categoryKeys).toSet();
-        if (!resolved.any(cats.contains)) continue;
+        var match = resolved.any(cats.contains);
+        // …or by NAME: my selected categories' labels vs the labels synced
+        // with friends' restaurants. Same name = same category, no links.
+        if (!match && pin.categoryLabels.isNotEmpty) {
+          final myLabels = {
+            for (final k in cats)
+              if (CategoryStore.byKey(k) case final c?)
+                CategoryMapping.norm(c.label)
+          };
+          match = pin.categoryLabels.any(myLabels.contains);
+        }
+        if (!match) continue;
       }
       final rating =
           raters.fold<double>(0, (s, r) => s + r.rating) / raters.length;

@@ -6,11 +6,16 @@ class UserProfile {
   final String username;
   final String bio;
 
+  /// Profile picture as a base64-encoded small JPEG ('' = none). Kept tiny
+  /// (~256px) so it fits comfortably inside the Firestore profile doc.
+  final String photo;
+
   const UserProfile({
     required this.id,
     required this.name,
     required this.username,
     this.bio = '',
+    this.photo = '',
   });
 
   String get initials {
@@ -22,21 +27,29 @@ class UserProfile {
         .toUpperCase();
   }
 
-  UserProfile copyWith({String? name, String? username, String? bio}) =>
+  UserProfile copyWith(
+          {String? name, String? username, String? bio, String? photo}) =>
       UserProfile(
         id: id,
         name: name ?? this.name,
         username: username ?? this.username,
         bio: bio ?? this.bio,
+        photo: photo ?? this.photo,
       );
 
-  Map<String, dynamic> toJson() =>
-      {'id': id, 'name': name, 'username': username, 'bio': bio};
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'username': username,
+        'bio': bio,
+        'photo': photo,
+      };
 
   factory UserProfile.fromJson(Map<String, dynamic> j) => UserProfile(
         id: j['id'] as String,
         name: j['name'] as String? ?? 'You',
         username: j['username'] as String? ?? 'you',
         bio: j['bio'] as String? ?? '',
+        photo: j['photo'] as String? ?? '',
       );
 }

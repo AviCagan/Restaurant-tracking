@@ -1,4 +1,7 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../data/auth_service.dart';
 import '../data/firebase_services.dart';
@@ -86,6 +89,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
         bio: bioCtrl.text.trim(),
       ));
     }
+  }
+
+  /// Pick a profile photo: stored as a tiny base64 JPEG on the profile,
+  /// synced to friends through the profile doc. Works on web + Android.
+  Future<void> _pickPhoto(UserProfile user) async {
+    final img = await ImagePicker().pickImage(
+        source: ImageSource.gallery, maxWidth: 256, imageQuality: 70);
+    if (img == null) return;
+    final bytes = await img.readAsBytes();
+    if (bytes.lengthInBytes > 400 * 1024) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('That image is too large — try a smaller one.')));
+      }
+      return;
+    }
+    await AuthService.updateProfile(
+        user.copyWith(photo: base64Encode(bytes)));
   }
 
   /// Two-step account deletion: "are you sure?", then type CONFIRM
@@ -185,19 +206,46 @@ class _ProfileScreenState extends State<ProfileScreen> {
               Center(
                 child: Column(
                   children: [
-                    Container(
-                      width: 88,
-                      height: 88,
-                      decoration: BoxDecoration(
-                        color: AppTheme.accent.withValues(alpha: 0.15),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Center(
-                        child: Text(user.initials,
-                            style: TextStyle(
+                    GestureDetector(
+                      onTap: () => _pickPhoto(user),
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          Container(
+                            width: 88,
+                            height: 88,
+                            decoration: BoxDecoration(
+                              color: AppTheme.accent.withValues(alpha: 0.15),
+                              shape: BoxShape.circle,
+                            ),
+                            clipBehavior: Clip.antiAlias,
+                            child: user.photo.isNotEmpty
+                                ? Image.memory(base64Decode(user.photo),
+                                    fit: BoxFit.cover, gaplessPlayback: true)
+                                : Center(
+                                    child: Text(user.initials,
+                                        style: TextStyle(
+                                            color: AppTheme.accent,
+                                            fontWeight: FontWeight.w900,
+                                            fontSize: 30)),
+                                  ),
+                          ),
+                          Positioned(
+                            right: -2,
+                            bottom: -2,
+                            child: Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
                                 color: AppTheme.accent,
-                                fontWeight: FontWeight.w900,
-                                fontSize: 30)),
+                                shape: BoxShape.circle,
+                                border:
+                                    Border.all(color: Colors.white, width: 2),
+                              ),
+                              child: const Icon(Icons.camera_alt,
+                                  size: 14, color: Colors.white),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 12),

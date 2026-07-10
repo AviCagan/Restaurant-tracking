@@ -1,10 +1,13 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 
 import '../data/social_service.dart';
 import '../models/price_tier.dart';
 import '../theme/app_theme.dart';
 
-/// Avatar circle showing a person's initials.
+/// Avatar circle: the person's profile photo when they have one (looked up
+/// automatically by name), otherwise their initials.
 class PersonAvatar extends StatelessWidget {
   const PersonAvatar({super.key, required this.name, this.size = 42});
   final String name;
@@ -12,6 +15,22 @@ class PersonAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final photo = SocialService.photoOf(name);
+    if (photo.isNotEmpty) {
+      try {
+        return ClipOval(
+          child: Image.memory(
+            base64Decode(photo),
+            width: size,
+            height: size,
+            fit: BoxFit.cover,
+            gaplessPlayback: true,
+          ),
+        );
+      } catch (_) {
+        // Corrupt photo data — fall through to initials.
+      }
+    }
     final p =
         name.trim().split(RegExp(r'\s+')).where((e) => e.isNotEmpty).toList();
     final initials = p.isEmpty

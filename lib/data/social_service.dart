@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../models/category.dart';
+import 'auth_service.dart';
 import 'block_store.dart';
 import 'plan_store.dart';
 
@@ -15,6 +16,11 @@ class MapPlace {
   /// Category keys as the friends tagged them (may be named differently from
   /// the current user's categories — resolved via CategoryMapping).
   final List<String> categoryKeys;
+
+  /// Normalized category *labels* ("chinese", "fastfood"), synced with the
+  /// restaurant — same-named categories match across friends with no
+  /// linking step at all.
+  final List<String> categoryLabels;
   final List<FriendVisit> visits;
 
   const MapPlace({
@@ -24,6 +30,7 @@ class MapPlace {
     required this.lat,
     required this.lng,
     required this.categoryKeys,
+    this.categoryLabels = const [],
     required this.visits,
   });
 
@@ -38,7 +45,12 @@ class MapPlace {
 class Friend {
   final String name;
   final String username;
-  const Friend(this.name, this.username);
+
+  /// From their profile doc (live): short bio and base64 profile photo.
+  final String bio;
+  final String photo;
+
+  const Friend(this.name, this.username, {this.bio = '', this.photo = ''});
 
   String get initials {
     final p = name.trim().split(RegExp(r'\s+')).where((e) => e.isNotEmpty).toList();
@@ -129,6 +141,17 @@ class SocialService {
   /// Accept or decline a plan invite.
   static Future<void> respondInvite(PlanInvite invite, bool going) async {
     await cloudRespondInvite?.call(invite, going);
+  }
+
+  /// Base64 profile photo for [name] — mine or a friend's ('' = none).
+  /// Lets every avatar in the app show real photos with no plumbing.
+  static String photoOf(String name) {
+    final me = AuthService.user.value;
+    if (me != null && me.name == name) return me.photo;
+    for (final f in friends.value) {
+      if (f.name == name) return f.photo;
+    }
+    return '';
   }
 
   static final ValueNotifier<List<Friend>> friends =

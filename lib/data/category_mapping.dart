@@ -68,9 +68,12 @@ class CategoryMapping {
       keys.map(resolve).toList();
 
   /// Lowercase and strip everything but letters/digits, so "Chinese 🥡",
-  /// "chinese" and "Chinese!" all count as the same category name.
-  static String _norm(String s) =>
+  /// "chinese" and "Chinese!" all count as the same category name. Public:
+  /// restaurant sync writes normalized labels with this too.
+  static String norm(String s) =>
       s.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+
+  static String _norm(String s) => norm(s);
 
   /// Auto-link a friend's categories to yours when they're obviously the
   /// same — identical key or identical (normalized) label. Skips anything
