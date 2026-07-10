@@ -19,6 +19,9 @@ external bool _isStandalone();
 @JS('yumsSaveIcs')
 external void _saveIcs(String content, String filename);
 
+@JS('yumsVibrate')
+external bool _vibrate(int ms);
+
 /// Chrome/Edge on Android fire `beforeinstallprompt` — when captured, we
 /// can pop the real install dialog from a button.
 bool canInstallPwa() {
@@ -56,6 +59,16 @@ bool isAndroidBrowser() {
 bool isStandalonePwa() {
   try {
     return _isStandalone();
+  } catch (_) {
+    return false;
+  }
+}
+
+/// Buzz for [ms] milliseconds via the browser Vibration API. Works on
+/// Android browsers; iOS Safari has no vibration API (returns false).
+bool vibrate(int ms) {
+  try {
+    return _vibrate(ms);
   } catch (_) {
     return false;
   }

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -84,8 +85,16 @@ class CalendarService {
   }
 
   /// Add [plan] to the user's preferred calendar, asking (and remembering)
-  /// on first use.
+  /// on first use. The Android app is Google-only (no Apple Calendar
+  /// there), so no chooser.
   static Future<void> addToCalendar(BuildContext context, Plan plan) async {
+    if (!kIsWeb) {
+      try {
+        await launchUrl(googleCalendarUrl(plan),
+            mode: LaunchMode.externalApplication);
+      } catch (_) {}
+      return;
+    }
     var provider = AppPrefs.calendarProvider.value;
     if (provider != 'google' && provider != 'apple') {
       final choice = await showChooser(context);

@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 
 import '../data/app_prefs.dart';
+import '../data/friend_group_store.dart';
 import '../data/rating_bars_store.dart';
 import '../models/item.dart';
 import '../models/price_tier.dart';
@@ -52,6 +53,8 @@ class VisitFormState extends State<VisitForm> {
 
   DateTime _date = DateTime.now();
   String _visibility = AppPrefs.defaultVisibility.value;
+  List<String> _audience = [];
+  String _groupName = '';
   int _food = 5;
   int _atmosphere = 5;
   int _priceTier = 2;
@@ -70,6 +73,8 @@ class VisitFormState extends State<VisitForm> {
     if (v != null) {
       _date = v.date;
       _visibility = v.visibility;
+      _audience = List.of(v.audience);
+      _groupName = v.groupName;
       _food = v.foodRating;
       _atmosphere = v.atmosphereRating;
       _priceTier = PriceTier.clamp(v.price);
@@ -118,6 +123,8 @@ class VisitFormState extends State<VisitForm> {
       items: items,
       photoPaths: List.of(_photoPaths),
       visibility: _visibility,
+      audience: _visibility == 'group' ? List.of(_audience) : const [],
+      groupName: _visibility == 'group' ? _groupName : '',
       isTakeout: _isTakeout,
       extraRatings: {
         // Bars currently shown default to 5 even if never tapped, matching
@@ -126,6 +133,62 @@ class VisitFormState extends State<VisitForm> {
         ..._extras,
       },
     );
+  }
+
+  /// Share with just one of my friend groups. Picks (or re-picks) the group
+  /// and snapshots its members as the visit's audience.
+  Future<void> _pickGroup() async {
+    final groups = FriendGroupStore.all.value;
+    if (groups.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('No groups yet — create one in Friends → Groups, '
+              'then share ratings to it!')));
+      return;
+    }
+    final picked = await showModalBottomSheet<FriendGroup>(
+      context: context,
+      backgroundColor: context.colors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+              child: Text('Share with which group?',
+                  style: AppTheme.heading(
+                      18, color: sheetContext.colors.ink)),
+            ),
+            ...groups.map((g) => ListTile(
+                  leading: Text(g.emoji,
+                      style: const TextStyle(fontSize: 22)),
+                  title: Text(g.name,
+                      style:
+                          const TextStyle(fontWeight: FontWeight.w700)),
+                  subtitle: Text(
+                      '${g.usernames.length} '
+                      '${g.usernames.length == 1 ? 'person' : 'people'}',
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: sheetContext.colors.subtle)),
+                  onTap: () => Navigator.pop(sheetContext, g),
+                )),
+            const SizedBox(height: 12),
+          ],
+        ),
+      ),
+    );
+    if (picked == null || !mounted) return;
+    Haptics.tick();
+    setState(() {
+      _visibility = 'group';
+      _groupName = picked.name;
+      _audience =
+          picked.usernames.map((u) => u.toLowerCase()).toList();
+    });
   }
 
   Future<void> _pickDate() async {
@@ -310,7 +373,9 @@ class VisitFormState extends State<VisitForm> {
         const SizedBox(height: 8),
         _PrivacyToggle(
           value: _visibility,
+          groupName: _groupName,
           onChanged: (v) => setState(() => _visibility = v),
+          onPickGroup: _pickGroup,
         ),
         const SizedBox(height: 22),
 
@@ -526,42 +591,55 @@ class _SectionLabel extends StatelessWidget {
 }
 
 class _PrivacyToggle extends StatelessWidget {
-  const _PrivacyToggle({required this.value, required this.onChanged});
+  const _PrivacyToggle({
+    required this.value,
+    required this.groupName,
+    required this.onChanged,
+    required this.onPickGroup,
+  });
   final String value;
+  final String groupName;
   final ValueChanged<String> onChanged;
+  final VoidCallback onPickGroup;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    Widget option(String key, IconData icon, String label, String sub) {
+    Widget option(String key, IconData icon, String label, String sub,
+        {VoidCallback? onTap, bool expanded = true}) {
       final on = value == key;
-      return Expanded(
-        child: GestureDetector(
-          onTap: () {
-            Haptics.tick();
-            onChanged(key);
-          },
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 120),
-            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
-            decoration: BoxDecoration(
-              color: on ? AppTheme.accent : colors.surface,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: on ? AppTheme.accent : colors.line),
-            ),
-            child: Row(
-              children: [
-                Icon(icon, size: 20, color: on ? Colors.white : colors.subtle),
-                const SizedBox(width: 10),
-                Column(
+      final tile = GestureDetector(
+        onTap: onTap ??
+            () {
+              Haptics.tick();
+              onChanged(key);
+            },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 120),
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+          decoration: BoxDecoration(
+            color: on ? AppTheme.accent : colors.surface,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: on ? AppTheme.accent : colors.line),
+          ),
+          child: Row(
+            children: [
+              Icon(icon, size: 20, color: on ? Colors.white : colors.subtle),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                             fontWeight: FontWeight.w800,
                             fontSize: 14,
                             color: on ? Colors.white : colors.ink)),
                     Text(sub,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                             fontSize: 10.5,
                             color: on
@@ -569,18 +647,36 @@ class _PrivacyToggle extends StatelessWidget {
                                 : colors.subtle)),
                   ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       );
+      return expanded ? Expanded(child: tile) : tile;
     }
 
-    return Row(
+    final groupOn = value == 'group' && groupName.isNotEmpty;
+    return Column(
       children: [
-        option('friends', Icons.group_outlined, 'Friends', 'They can see it'),
-        const SizedBox(width: 10),
-        option('private', Icons.lock_outline, 'Private', 'Only you'),
+        Row(
+          children: [
+            option('friends', Icons.group_outlined, 'Friends',
+                'They can see it'),
+            const SizedBox(width: 10),
+            option('private', Icons.lock_outline, 'Private', 'Only you'),
+          ],
+        ),
+        const SizedBox(height: 10),
+        option(
+          'group',
+          Icons.diversity_3_outlined,
+          groupOn ? groupName : 'A group',
+          groupOn
+              ? 'Only this group sees it — tap to change'
+              : 'Pick one of your friend groups',
+          onTap: onPickGroup,
+          expanded: false,
+        ),
       ],
     );
   }

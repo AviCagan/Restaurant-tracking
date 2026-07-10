@@ -13,8 +13,16 @@ class Visit {
   final List<Item> items;
   final List<String> photoPaths;
 
-  /// 'private' (only you) or 'friends' (visible to friends).
+  /// 'private' (only you), 'friends' (all friends), or 'group' (only the
+  /// friends listed in [audience]).
   final String visibility;
+
+  /// Usernames allowed to see this visit when [visibility] == 'group'
+  /// (a snapshot of the group's members at rating time).
+  final List<String> audience;
+
+  /// Display name of the group chosen when [visibility] == 'group'.
+  final String groupName;
 
   /// True when this was delivery/takeout — no atmosphere to rate.
   final bool isTakeout;
@@ -32,11 +40,21 @@ class Visit {
     this.items = const [],
     this.photoPaths = const [],
     this.visibility = 'friends',
+    this.audience = const [],
+    this.groupName = '',
     this.isTakeout = false,
     this.extraRatings = const {},
   });
 
   bool get isPrivate => visibility == 'private';
+
+  /// Anyone besides me can see it (all friends, or a group of them).
+  bool get isShared => visibility == 'friends' || visibility == 'group';
+
+  /// Whether the friend with [username] is allowed to see this visit.
+  bool visibleTo(String username) =>
+      visibility == 'friends' ||
+      (visibility == 'group' && audience.contains(username.toLowerCase()));
 
   /// A takeout visit's score is food only; dine-in averages food+atmosphere.
   double get overall =>
@@ -51,6 +69,8 @@ class Visit {
     List<Item>? items,
     List<String>? photoPaths,
     String? visibility,
+    List<String>? audience,
+    String? groupName,
     bool? isTakeout,
     Map<String, int>? extraRatings,
   }) =>
@@ -64,6 +84,8 @@ class Visit {
         items: items ?? this.items,
         photoPaths: photoPaths ?? this.photoPaths,
         visibility: visibility ?? this.visibility,
+        audience: audience ?? this.audience,
+        groupName: groupName ?? this.groupName,
         isTakeout: isTakeout ?? this.isTakeout,
         extraRatings: extraRatings ?? this.extraRatings,
       );
@@ -78,6 +100,8 @@ class Visit {
         'items': items.map((e) => e.toJson()).toList(),
         'photoPaths': photoPaths,
         'visibility': visibility,
+        if (audience.isNotEmpty) 'audience': audience,
+        if (groupName.isNotEmpty) 'groupName': groupName,
         'takeout': isTakeout,
         'extras': extraRatings,
       };
@@ -97,6 +121,10 @@ class Visit {
             .map((e) => e.toString())
             .toList(),
         visibility: j['visibility'] as String? ?? 'friends',
+        audience: (j['audience'] as List? ?? [])
+            .map((e) => e.toString().toLowerCase())
+            .toList(),
+        groupName: j['groupName'] as String? ?? '',
         isTakeout: j['takeout'] as bool? ?? false,
         extraRatings: (j['extras'] as Map? ?? {}).map(
             (k, v) => MapEntry(k.toString(), (v as num).toInt())),

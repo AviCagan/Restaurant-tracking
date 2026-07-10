@@ -10,6 +10,7 @@ import '../models/restaurant.dart';
 import '../models/user_profile.dart';
 import '../theme/app_theme.dart';
 import '../widgets/gradient_app_bar.dart';
+import '../widgets/photo_source_sheet.dart';
 import '../widgets/restaurant_card.dart';
 import '../widgets/sign_in_prompt.dart';
 import 'all_restaurants_screen.dart';
@@ -91,11 +92,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  /// Pick a profile photo: stored as a tiny base64 JPEG on the profile,
-  /// synced to friends through the profile doc. Works on web + Android.
+  /// Pick a profile photo (camera or library): stored as a tiny base64
+  /// JPEG on the profile, synced to friends through the profile doc.
+  /// Works on web + Android.
   Future<void> _pickPhoto(UserProfile user) async {
-    final img = await ImagePicker().pickImage(
-        source: ImageSource.gallery, maxWidth: 256, imageQuality: 70);
+    final source = await PhotoSourceSheet.show(context);
+    if (source == null) return;
+    final img = await ImagePicker()
+        .pickImage(source: source, maxWidth: 256, imageQuality: 70);
     if (img == null) return;
     final bytes = await img.readAsBytes();
     if (bytes.lengthInBytes > 400 * 1024) {

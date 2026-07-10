@@ -68,6 +68,18 @@ service cloud.firestore {
       }
     }
 
+    // The shared category database: readable by everyone signed in;
+    // anyone can add a new category (immutable once created, and the doc
+    // id must be the normalized form of its label).
+    match /catalog/{key} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.label is string
+        && request.resource.data.label.size() >= 2
+        && request.resource.data.label.size() <= 30;
+      allow update, delete: if false;
+    }
+
     // Username -> uid lookup for adding friends.
     match /usernames/{username} {
       allow read: if signedIn();

@@ -16,6 +16,7 @@ import '../models/price_tier.dart';
 import '../models/restaurant.dart';
 import '../services/location_service.dart';
 import '../theme/app_theme.dart';
+import '../theme/map_styles.dart';
 import '../widgets/category_filter_sheet.dart';
 import '../widgets/feed_card.dart';
 import '../widgets/group_sheets.dart';
@@ -90,6 +91,19 @@ class _MapScreenState extends State<MapScreen> {
     super.initState();
     _resolveStart();
     _loadMine();
+    // Live pins: rebuild markers whenever friend data changes in the cloud
+    // (new ratings, removed friends…) — no app reload needed.
+    SocialService.version.addListener(_onSocialChanged);
+  }
+
+  @override
+  void dispose() {
+    SocialService.version.removeListener(_onSocialChanged);
+    super.dispose();
+  }
+
+  void _onSocialChanged() {
+    if (mounted) _buildMarkers();
   }
 
   Future<void> _resolveStart() async {
@@ -593,6 +607,11 @@ class _MapScreenState extends State<MapScreen> {
     return Stack(
       children: [
         GoogleMap(
+          // Night palette in dark mode, default in light — follows the
+          // app theme live.
+          style: Theme.of(context).brightness == Brightness.dark
+              ? MapStyles.dark
+              : null,
           initialCameraPosition:
               CameraPosition(target: _start ?? _defaultCenter, zoom: 13),
           onMapCreated: (c) {

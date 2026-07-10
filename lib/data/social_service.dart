@@ -160,6 +160,11 @@ class SocialService {
   static final ValueNotifier<List<Friend>> requests =
       ValueNotifier<List<Friend>>([]);
 
+  /// Bumped by the cloud layer every time friend data (feed, map places,
+  /// reviews…) is rebuilt — screens listen to this to refresh live, with
+  /// no app reload.
+  static final ValueNotifier<int> version = ValueNotifier<int>(0);
+
   /// Called by the cloud layer on sign-out / account deletion: back to a
   /// clean, empty local state.
   static void resetLocal() {
@@ -173,6 +178,7 @@ class SocialService {
     invites.value = [];
     friends.value = [];
     requests.value = [];
+    version.value++;
   }
 
   static List<FeedItem> feed() {

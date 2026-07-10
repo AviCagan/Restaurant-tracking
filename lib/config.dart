@@ -45,5 +45,5 @@ class AppConfig {
 
   /// Shown on the welcome screen + Settings → About, so "which build am I
   /// actually running?" is answerable at a glance (browser caches lie).
-  static const String buildTag = 'Alpha 12';
+  static const String buildTag = 'Alpha V013';
 }

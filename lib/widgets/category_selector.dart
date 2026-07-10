@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/category_store.dart';
 import '../models/category.dart';
 import '../theme/app_theme.dart';
+import 'catalog_sheet.dart';
 
 /// Multi-select chips for categories, backed by the editable [CategoryStore].
 /// When [editable] is true, shows an "Add" chip and lets you long-press a chip
@@ -20,13 +21,9 @@ class CategorySelector extends StatelessWidget {
   final bool editable;
 
   Future<void> _addCategory(BuildContext context) async {
-    final result = await showDialog<_NewCategory>(
-      context: context,
-      builder: (_) => const _AddCategoryDialog(),
-    );
-    if (result == null) return;
-    final cat =
-        await CategoryStore.add(result.label, iconIndex: result.iconIndex);
+    // Pick from (or contribute to) the shared category database.
+    final cat = await CatalogSheet.show(context);
+    if (cat == null) return;
     onChanged({...selected, cat.key});
   }
 
@@ -146,98 +143,6 @@ class _Chip extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-class _NewCategory {
-  final String label;
-  final int iconIndex;
-  _NewCategory(this.label, this.iconIndex);
-}
-
-class _AddCategoryDialog extends StatefulWidget {
-  const _AddCategoryDialog();
-
-  @override
-  State<_AddCategoryDialog> createState() => _AddCategoryDialogState();
-}
-
-class _AddCategoryDialogState extends State<_AddCategoryDialog> {
-  final _ctrl = TextEditingController();
-  int _iconIndex = 16; // generic label icon
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.colors;
-    return AlertDialog(
-      title: const Text('New category'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          TextField(
-            controller: _ctrl,
-            autofocus: true,
-            textCapitalization: TextCapitalization.words,
-            decoration: const InputDecoration(hintText: 'e.g. Sushi'),
-          ),
-          const SizedBox(height: 16),
-          Text('Icon', style: TextStyle(fontSize: 13, color: colors.subtle)),
-          const SizedBox(height: 8),
-          SizedBox(
-            height: 96,
-            width: 300,
-            child: GridView.builder(
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 6,
-                mainAxisSpacing: 6,
-                crossAxisSpacing: 6,
-              ),
-              itemCount: categoryIcons.length,
-              itemBuilder: (_, i) {
-                final on = i == _iconIndex;
-                return GestureDetector(
-                  onTap: () => setState(() => _iconIndex = i),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: on
-                          ? AppTheme.accent.withValues(alpha: 0.15)
-                          : colors.background,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                          color: on ? AppTheme.accent : Colors.transparent),
-                    ),
-                    child: Icon(categoryIcons[i],
-                        size: 18,
-                        color: on ? AppTheme.accent : colors.subtle),
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-      actions: [
-        TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel')),
-        FilledButton(
-          style: FilledButton.styleFrom(backgroundColor: AppTheme.accent),
-          onPressed: () {
-            final label = _ctrl.text.trim();
-            if (label.isEmpty) return;
-            Navigator.pop(context, _NewCategory(label, _iconIndex));
-          },
-          child: const Text('Add'),
-        ),
-      ],
     );
   }
 }

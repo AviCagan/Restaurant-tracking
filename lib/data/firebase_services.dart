@@ -21,6 +21,7 @@ import '../services/web_bridge/web_bridge.dart' as web;
 import 'app_prefs.dart';
 import 'auth_service.dart';
 import 'block_store.dart';
+import 'catalog.dart';
 import 'category_mapping.dart';
 import 'category_store.dart';
 import 'local_reset.dart';
@@ -425,6 +426,7 @@ class _CloudSocial {
     SocialService.cloudCancelPlan = _cancelPlan;
     SocialService.cloudSendReply = _sendReply;
     SocialService.cloudRefreshCategories = _refreshAllCategories;
+    Catalog.start(_db); // live shared category database
 
     var invitesFirst = true;
     _invitesSub = _db
@@ -603,6 +605,7 @@ class _CloudSocial {
   }
 
   static void stop() {
+    Catalog.stop();
     _friendsSub?.cancel();
     _requestsSub?.cancel();
     _invitesSub?.cancel();
@@ -732,7 +735,8 @@ class _CloudSocial {
         continue;
       }
       final r = _tryParse(change.doc.data() ?? {});
-      if (r == null || r.visits.isEmpty) continue;
+      final me = AuthService.user.value?.username ?? '';
+      if (r == null || !r.visits.any((v) => v.visibleTo(me))) continue;
       NotificationService.show(
         '${friend.name} rated ${r.name} ⭐',
         '${r.overallRating.toStringAsFixed(1)}/10 — check it out on YUMS!',
@@ -757,12 +761,15 @@ class _CloudSocial {
     final favorites = <String, List<String>>{};
     final reviews = <String, List<FeedItem>>{};
 
+    final me = AuthService.user.value?.username ?? '';
     _friendRestaurants.forEach((uid, restaurants) {
       final friend = _friendByUid[uid];
       if (friend == null) return;
       for (final r in restaurants) {
+        // Everything they shared with all friends, plus group-only visits
+        // whose group includes me.
         final sharedVisits =
-            r.visits.where((v) => v.visibility == 'friends').toList();
+            r.visits.where((v) => v.visibleTo(me)).toList();
         if (sharedVisits.isEmpty) continue;
         sharedVisits.sort((a, b) => b.date.compareTo(a.date));
         final latest = sharedVisits.first;
@@ -811,6 +818,7 @@ class _CloudSocial {
     SocialService.cloudReviews = reviews;
     // Nudge listeners so open screens rebuild.
     SocialService.friends.value = List.of(SocialService.friends.value);
+    SocialService.version.value++;
   }
 
   // ---- Actions ----
@@ -1184,9 +1192,10 @@ class _CloudSync {
     if (uid == null) return;
     try {
       final map = r.toMap();
-      map['visibility'] = r.visits.any((v) => v.visibility == 'friends')
-          ? 'friends'
-          : 'private';
+      // Group visits still publish under 'friends' (the query friends use);
+      // each reader filters visits to what's actually shared with them.
+      map['visibility'] =
+          r.visits.any((v) => v.isShared) ? 'friends' : 'private';
       // Denormalized, normalized category labels: friends match these by
       // NAME ("chinese" == "Chinese 🥡") — no key-linking required.
       map['categoryLabels'] = [

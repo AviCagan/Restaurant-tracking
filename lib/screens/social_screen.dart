@@ -28,6 +28,24 @@ class SocialScreen extends StatefulWidget {
 class _SocialScreenState extends State<SocialScreen> {
   String? _groupId; // null = everyone
 
+  @override
+  void initState() {
+    super.initState();
+    // Live feed: rebuild whenever the cloud layer refreshes friend data
+    // (new ratings, removed friends…) — no app reload needed.
+    SocialService.version.addListener(_onSocialChanged);
+  }
+
+  @override
+  void dispose() {
+    SocialService.version.removeListener(_onSocialChanged);
+    super.dispose();
+  }
+
+  void _onSocialChanged() {
+    if (mounted) setState(() {});
+  }
+
   void _openManage(BuildContext context) => Navigator.push(context,
       MaterialPageRoute(builder: (_) => const FriendsManageScreen()));
 

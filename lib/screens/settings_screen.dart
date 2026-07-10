@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
 import '../config.dart';
@@ -8,6 +9,7 @@ import '../services/calendar_service.dart';
 import '../theme/app_theme.dart';
 import '../theme/theme_controller.dart';
 import '../widgets/gradient_app_bar.dart';
+import 'categories_screen.dart';
 import 'customize_screen.dart';
 import 'notification_settings_screen.dart';
 import 'tour_screen.dart';
@@ -68,6 +70,28 @@ class SettingsScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 24),
+          const _SectionLabel('Categories'),
+          Container(
+            decoration: BoxDecoration(
+              color: colors.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: colors.line),
+            ),
+            child: ListTile(
+              leading: Icon(Icons.category_outlined, color: AppTheme.accent),
+              title: const Text('My categories',
+                  style: TextStyle(fontWeight: FontWeight.w700)),
+              subtitle: Text('Add from the shared database, rename & style',
+                  style: TextStyle(color: colors.subtle, fontSize: 12)),
+              trailing: Icon(Icons.chevron_right, color: colors.subtle),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const CategoriesScreen()),
+              ),
+            ),
+          ),
+          if (kIsWeb) ...[
+          const SizedBox(height: 24),
           const _SectionLabel('Calendar'),
           ValueListenableBuilder<String>(
             valueListenable: AppPrefs.calendarProvider,
@@ -95,6 +119,7 @@ class SettingsScreen extends StatelessWidget {
               ),
             ),
           ),
+          ],
           const SizedBox(height: 24),
           const _SectionLabel('Privacy'),
           Container(

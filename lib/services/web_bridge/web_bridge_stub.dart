@@ -10,3 +10,5 @@ bool isAndroidBrowser() => false;
 bool isStandalonePwa() => false;
 
 bool saveIcsFile(String content, String filename) => false;
+
+bool vibrate(int ms) => false;

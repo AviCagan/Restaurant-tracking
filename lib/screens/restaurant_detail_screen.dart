@@ -514,8 +514,20 @@ class _VisitCard extends StatelessWidget {
                   style: const TextStyle(
                       fontWeight: FontWeight.w800, fontSize: 14)),
               const SizedBox(width: 8),
-              Icon(visit.isPrivate ? Icons.lock_outline : Icons.group_outlined,
-                  size: 13, color: colors.subtle),
+              Icon(
+                  visit.isPrivate
+                      ? Icons.lock_outline
+                      : visit.visibility == 'group'
+                          ? Icons.diversity_3_outlined
+                          : Icons.group_outlined,
+                  size: 13,
+                  color: colors.subtle),
+              if (visit.visibility == 'group' &&
+                  visit.groupName.isNotEmpty) ...[
+                const SizedBox(width: 3),
+                Text(visit.groupName,
+                    style: TextStyle(fontSize: 11, color: colors.subtle)),
+              ],
               if (visit.isTakeout) ...[
                 const SizedBox(width: 6),
                 Container(

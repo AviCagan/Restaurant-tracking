@@ -32,7 +32,17 @@ class _MainScaffoldState extends State<MainScaffold> {
   int _index = 0;
   final _pageController = PageController();
 
+  /// Fingers currently on the body. With 2+ down (map panning/pinching —
+  /// the web map needs two fingers) page swiping turns off, so panning the
+  /// map never drags you to another tab. One finger still swipes pages.
+  int _touches = 0;
+
   Timer? _arrivalTimer;
+
+  void _touchesChanged(int delta) {
+    final n = (_touches + delta).clamp(0, 10);
+    if (n != _touches) setState(() => _touches = n);
+  }
 
   @override
   void initState() {
@@ -151,10 +161,22 @@ class _MainScaffoldState extends State<MainScaffold> {
             ),
           ),
           Expanded(
-            child: PageView(
-              controller: _pageController,
-              onPageChanged: (i) => setState(() => _index = i),
-              children: _screens,
+            child: Listener(
+              behavior: HitTestBehavior.translucent,
+              onPointerDown: (_) => _touchesChanged(1),
+              onPointerUp: (_) => _touchesChanged(-1),
+              onPointerCancel: (_) => _touchesChanged(-1),
+              // Trackpad two-finger gestures count as multi-touch too.
+              onPointerPanZoomStart: (_) => _touchesChanged(2),
+              onPointerPanZoomEnd: (_) => _touchesChanged(-2),
+              child: PageView(
+                controller: _pageController,
+                physics: _touches >= 2
+                    ? const NeverScrollableScrollPhysics()
+                    : const PageScrollPhysics(),
+                onPageChanged: (i) => setState(() => _index = i),
+                children: _screens,
+              ),
             ),
           ),
         ],

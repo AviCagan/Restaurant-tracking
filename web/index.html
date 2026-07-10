@@ -47,6 +47,14 @@
     window.yumsIsStandalone = () =>
       window.matchMedia('(display-mode: standalone)').matches ||
       window.navigator.standalone === true;
+    // Vibration API: real haptics on Android browsers (iOS Safari has no
+    // vibration API, so this quietly does nothing there).
+    window.yumsVibrate = (ms) => {
+      try {
+        if (navigator.vibrate) return navigator.vibrate(ms);
+      } catch (_) {}
+      return false;
+    };
     window.yumsSaveIcs = (content, filename) => {
       const blob = new Blob([content], { type: 'text/calendar' });
       const url = URL.createObjectURL(blob);

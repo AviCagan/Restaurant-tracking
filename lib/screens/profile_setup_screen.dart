@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../data/catalog.dart';
 import '../data/category_store.dart';
 import '../data/firebase_services.dart';
 import '../models/category.dart';
@@ -38,7 +39,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   Future<void> _finish() async {
     // Only keep what they actually chose (their own creations included).
     final chosen = [
-      ...defaultCategories.where((c) => _picked.contains(c.key)),
+      ...Catalog.starters.where((c) => _picked.contains(c.key)),
       ..._custom.where((c) => _picked.contains(c.key)),
     ];
     if (chosen.isEmpty) {
@@ -132,11 +133,16 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       ),
     );
     if (ok == true && nameCtrl.text.trim().isNotEmpty) {
+      final label = nameCtrl.text.trim();
+      final canonical = Catalog.keyFor(label);
       final cat = AppCategory(
-        key: 'custom_${DateTime.now().millisecondsSinceEpoch}',
-        label: nameCtrl.text.trim(),
+        key: canonical.length >= 2
+            ? canonical
+            : 'custom_${DateTime.now().millisecondsSinceEpoch}',
+        label: label,
         iconIndex: iconIndex,
       );
+      Catalog.submit(label, iconIndex); // share it (best effort)
       setState(() {
         _custom.add(cat);
         _picked.add(cat.key); // you made it — obviously you want it
@@ -333,7 +339,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                   crossAxisSpacing: 10,
                   childAspectRatio: 2.7,
                   children: [
-                    ...defaultCategories.map(_categoryCard),
+                    ...Catalog.starters.map(_categoryCard),
                     ..._custom.map(_categoryCard),
                     _addYourOwnCard(),
                   ],
