@@ -58,6 +58,16 @@
       a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 5000);
     };
+    // When a freshly deployed version's service worker takes over, reload
+    // once so users see the new build immediately instead of next visit.
+    if ('serviceWorker' in navigator) {
+      let yumsReloaded = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (yumsReloaded) return;
+        yumsReloaded = true;
+        window.location.reload();
+      });
+    }
     // Installed-app manifest for everyone EXCEPT iOS (see note above).
     if (!window.yumsIsIos()) {
       const link = document.createElement('link');
