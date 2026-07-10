@@ -425,7 +425,6 @@ class _CloudSocial {
     SocialService.cloudRespondInvite = _respondInvite;
     SocialService.cloudCancelPlan = _cancelPlan;
     SocialService.cloudSendReply = _sendReply;
-    SocialService.cloudRefreshCategories = _refreshAllCategories;
     Catalog.start(_db); // live shared category database
 
     var invitesFirst = true;
@@ -693,7 +692,6 @@ class _CloudSocial {
           )
     ];
     SocialService.cloudCategories[friend.name] = cats;
-    CategoryMapping.autoLink(cats, CategoryStore.all.value);
     // Bio + photo ride along on the same doc.
     _friendByUid[uid] = Friend(
       data?['name'] as String? ?? friend.name,
@@ -701,8 +699,7 @@ class _CloudSocial {
       bio: data?['bio'] as String? ?? '',
       photo: data?['photo'] as String? ?? '',
     );
-    debugPrint('categories for ${friend.name}: ${cats.length} live, '
-        '${CategoryMapping.map.value.length} total links');
+    debugPrint('categories for ${friend.name}: ${cats.length} live');
     // Nudge open screens (avatars/compare/map) to rebuild.
     SocialService.friends.value = _friendByUid.values.toList();
   }
@@ -1084,15 +1081,6 @@ class _CloudSocial {
     }
   }
 
-  /// Re-run auto-linking over the live-cached categories (called when the
-  /// compare screen opens). The profile listeners keep the data itself
-  /// fresh, so this just re-matches against my current categories.
-  static Future<void> _refreshAllCategories() async {
-    for (final cats in SocialService.cloudCategories.values) {
-      await CategoryMapping.autoLink(cats, CategoryStore.all.value);
-    }
-  }
-
   static Future<void> _removeFriend(Friend f) async {
     final uid = _uid;
     if (uid == null) return;
@@ -1149,13 +1137,7 @@ class _CloudSync {
       }
     };
     RestaurantDatabase.onDelete = (id) => _deleteRestaurant(id);
-    CategoryStore.onChanged = () {
-      _pushCategories();
-      // My categories changed — re-check for name matches with friends'.
-      for (final cats in SocialService.cloudCategories.values) {
-        CategoryMapping.autoLink(cats, CategoryStore.all.value);
-      }
-    };
+    CategoryStore.onChanged = _pushCategories;
     AppPrefs.categoriesViewable.addListener(_pushPrefs);
     AppPrefs.defaultVisibility.addListener(_pushPrefs);
     AppPrefs.emailNotifs.addListener(_pushPrefs);

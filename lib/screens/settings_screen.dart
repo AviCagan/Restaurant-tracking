@@ -252,7 +252,7 @@ class SettingsScreen extends StatelessWidget {
                 const ListTile(
                   leading: Icon(Icons.restaurant_menu),
                   title: Text('YUMS'),
-                  subtitle: Text('Alpha pre-release · ${AppConfig.buildTag}'),
+                  subtitle: Text('Beta · ${AppConfig.buildTag}'),
                 ),
                 Divider(height: 1, color: colors.line),
                 ListTile(

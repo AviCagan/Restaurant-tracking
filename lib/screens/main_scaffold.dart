@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 
@@ -201,6 +202,22 @@ class _ProfileButton extends StatelessWidget {
       child: ValueListenableBuilder<UserProfile?>(
         valueListenable: AuthService.user,
         builder: (context, user, _) {
+          Widget? photo;
+          if (user != null && user.photo.isNotEmpty) {
+            try {
+              photo = ClipOval(
+                child: Image.memory(
+                  base64Decode(user.photo),
+                  width: 44,
+                  height: 44,
+                  fit: BoxFit.cover,
+                  gaplessPlayback: true,
+                ),
+              );
+            } catch (_) {
+              // Corrupt photo data — fall through to initials.
+            }
+          }
           return Container(
             width: 44,
             height: 44,
@@ -210,13 +227,14 @@ class _ProfileButton extends StatelessWidget {
               border: Border.all(color: Colors.white.withValues(alpha: 0.5),
                   width: 1.5),
             ),
-            child: Center(
-              child: user == null
-                  ? const Icon(Icons.person_outline,
-                      color: Colors.white, size: 22)
-                  : Text(user.initials,
-                      style: AppTheme.heading(16, color: Colors.white)),
-            ),
+            child: photo ??
+                Center(
+                  child: user == null
+                      ? const Icon(Icons.person_outline,
+                          color: Colors.white, size: 22)
+                      : Text(user.initials,
+                          style: AppTheme.heading(16, color: Colors.white)),
+                ),
           );
         },
       ),

@@ -20,7 +20,6 @@ import '../theme/map_styles.dart';
 import '../widgets/category_filter_sheet.dart';
 import '../widgets/feed_card.dart';
 import '../widgets/group_sheets.dart';
-import 'compare_categories_screen.dart';
 
 /// One person's rating of a place.
 class _Rater {
@@ -70,9 +69,19 @@ class MapScreen extends StatefulWidget {
   State<MapScreen> createState() => _MapScreenState();
 }
 
-class _MapScreenState extends State<MapScreen> {
+class _MapScreenState extends State<MapScreen>
+    with AutomaticKeepAliveClientMixin {
   GoogleMapController? _controller;
   static const _defaultCenter = LatLng(40.5900, -74.1200);
+
+  // Keep the map alive across page swipes — recreating it on every visit
+  // meant a jarring white flash + reload each time.
+  @override
+  bool get wantKeepAlive => true;
+
+  /// False until the platform map has drawn; a theme-colored cover hides
+  /// the platform view's white startup flash (ugly in dark mode).
+  bool _mapReady = false;
 
   Set<Marker> _markers = {};
   final Map<int, BitmapDescriptor> _pinCache = {};
@@ -80,6 +89,25 @@ class _MapScreenState extends State<MapScreen> {
   List<Restaurant> _myPlaces = [];
   // Selected people to filter by (empty = everyone).
   final Set<String> _people = {};
+  // Selected friend group to filter by (null = off). People and Groups are
+  // mutually exclusive — picking one clears the other.
+  String? _groupId;
+
+  /// The display names the map is filtered to right now (empty = everyone):
+  /// the chosen group's members, or the hand-picked people.
+  Set<String> get _activePeople {
+    final g = _groupId == null ? null : FriendGroupStore.byId(_groupId!);
+    if (g != null) {
+      final usernameToName = {
+        for (final f in SocialService.friends.value) f.username: f.name
+      };
+      return g.usernames
+          .map((u) => usernameToName[u])
+          .whereType<String>()
+          .toSet();
+    }
+    return _people;
+  }
 
   // Resolved before the map is built so it opens right where you are —
   // no flying across the city on load.
@@ -182,17 +210,17 @@ class _MapScreenState extends State<MapScreen> {
   /// its visible raters and the resulting average rating.
   List<(_Pin, List<_Rater>, double)> _visible() {
     final cats = FilterState.categories;
+    final people = _activePeople;
     final out = <(_Pin, List<_Rater>, double)>[];
     for (final pin in _allPins()) {
       var raters = pin.raters;
-      if (_people.isNotEmpty) {
-        raters = raters.where((r) => _people.contains(r.name)).toList();
+      if (people.isNotEmpty) {
+        raters = raters.where((r) => people.contains(r.name)).toList();
       }
       if (raters.isEmpty) continue;
       if (cats.isNotEmpty) {
-        // Match on keys (mine / manually linked)…
-        final resolved = CategoryMapping.resolveAll(pin.categoryKeys).toSet();
-        var match = resolved.any(cats.contains);
+        // Match on keys — canonical, so mine and my friends' line up…
+        var match = pin.categoryKeys.any(cats.contains);
         // …or by NAME: my selected categories' labels vs the labels synced
         // with friends' restaurants. Same name = same category, no links.
         if (!match && pin.categoryLabels.isNotEmpty) {
@@ -338,10 +366,6 @@ class _MapScreenState extends State<MapScreen> {
           }
 
           final colors = context.colors;
-          // Map group usernames -> display names used by the people filter.
-          final usernameToName = {
-            for (final f in SocialService.friends.value) f.username: f.name
-          };
           return SafeArea(
             child: ListView(
               shrinkWrap: true,
@@ -362,35 +386,6 @@ class _MapScreenState extends State<MapScreen> {
                     ],
                   ),
                 ),
-                if (FriendGroupStore.all.value.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-                    child: Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: FriendGroupStore.all.value.map((g) {
-                        final members = g.usernames
-                            .map((u) => usernameToName[u])
-                            .whereType<String>()
-                            .toSet();
-                        final on = members.isNotEmpty &&
-                            _people.length == members.length &&
-                            _people.containsAll(members);
-                        return FilterChip(
-                          selected: on,
-                          selectedColor:
-                              AppTheme.accent.withValues(alpha: 0.18),
-                          checkmarkColor: AppTheme.accent,
-                          avatar: GroupAvatar(group: g, size: 18),
-                          label: Text(g.name),
-                          onSelected: (_) => toggle(() {
-                            _people.clear();
-                            if (!on) _people.addAll(members);
-                          }),
-                        );
-                      }).toList(),
-                    ),
-                  ),
                 ..._peopleList.map((name) {
                   final on = _people.isEmpty || _people.contains(name);
                   return CheckboxListTile(
@@ -400,6 +395,7 @@ class _MapScreenState extends State<MapScreen> {
                     title: Text(name,
                         style: const TextStyle(fontWeight: FontWeight.w700)),
                     onChanged: (_) => toggle(() {
+                      _groupId = null; // hand-picking people beats the group
                       // Move from "everyone" to an explicit set on first tap.
                       if (_people.isEmpty) {
                         _people.addAll(_peopleList);
@@ -411,6 +407,76 @@ class _MapScreenState extends State<MapScreen> {
                         _people.clear(); // back to "everyone"
                       }
                     }),
+                  );
+                }),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  void _openGroups() {
+    if (FriendGroupStore.all.value.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('No groups yet — create one in Friends → Groups '
+              'to filter the map by it!')));
+      return;
+    }
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: context.colors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => StatefulBuilder(
+        builder: (context, setSheet) {
+          void pick(String? id) {
+            setSheet(() {});
+            setState(() {
+              _groupId = id;
+              if (id != null) _people.clear(); // group beats hand-picking
+            });
+            _buildMarkers().then((_) => _fitToMarkers());
+          }
+
+          final colors = context.colors;
+          return SafeArea(
+            child: ListView(
+              shrinkWrap: true,
+              padding: const EdgeInsets.fromLTRB(8, 16, 8, 16),
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Row(
+                    children: [
+                      Text('Which group?',
+                          style: AppTheme.heading(18, color: colors.ink)),
+                      const Spacer(),
+                      if (_groupId != null)
+                        TextButton(
+                          onPressed: () => pick(null),
+                          child: const Text('Everyone'),
+                        ),
+                    ],
+                  ),
+                ),
+                ...FriendGroupStore.all.value.map((g) {
+                  final on = g.id == _groupId;
+                  return ListTile(
+                    leading: GroupAvatar(group: g, size: 38),
+                    title: Text(g.name,
+                        style: const TextStyle(fontWeight: FontWeight.w700)),
+                    subtitle: Text(
+                        '${g.usernames.length} '
+                        '${g.usernames.length == 1 ? 'person' : 'people'}',
+                        style:
+                            TextStyle(fontSize: 12, color: colors.subtle)),
+                    trailing: on
+                        ? Icon(Icons.check_circle, color: AppTheme.accent)
+                        : null,
+                    onTap: () => pick(on ? null : g.id),
                   );
                 }),
               ],
@@ -598,11 +664,16 @@ class _MapScreenState extends State<MapScreen> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // AutomaticKeepAliveClientMixin
     final colors = context.colors;
     final filterCount = FilterState.categories.length;
     final peopleActive = _people.isNotEmpty;
+    final group = _groupId == null ? null : FriendGroupStore.byId(_groupId!);
     if (!_startResolved) {
-      return const Center(child: CircularProgressIndicator());
+      return Container(
+        color: colors.background,
+        child: const Center(child: CircularProgressIndicator()),
+      );
     }
     return Stack(
       children: [
@@ -618,6 +689,10 @@ class _MapScreenState extends State<MapScreen> {
             _controller = c;
             // Only jump if we opened without a known position.
             if (_start == null) _recenter(animate: false);
+            // Give the tiles a beat to draw, then lift the cover.
+            Future.delayed(const Duration(milliseconds: 350), () {
+              if (mounted) setState(() => _mapReady = true);
+            });
           },
           markers: _markers,
           myLocationEnabled: true,
@@ -629,6 +704,15 @@ class _MapScreenState extends State<MapScreen> {
                 () => EagerGestureRecognizer()),
           },
         ),
+        // Theme-colored cover that fades away once the map has drawn —
+        // no white flash while the platform view boots up.
+        IgnorePointer(
+          child: AnimatedOpacity(
+            opacity: _mapReady ? 0 : 1,
+            duration: const Duration(milliseconds: 250),
+            child: Container(color: colors.background),
+          ),
+        ),
         Positioned(
           top: 12,
           left: 16,
@@ -638,8 +722,10 @@ class _MapScreenState extends State<MapScreen> {
             child: Row(
               children: [
                 _MapButton(
-                  icon: Icons.tune_rounded,
-                  label: filterCount > 0 ? 'Filters ($filterCount)' : 'Filter',
+                  icon: Icons.category_rounded,
+                  label: filterCount > 0
+                      ? 'Categories ($filterCount)'
+                      : 'Categories',
                   active: filterCount > 0,
                   onTap: _openFilter,
                 ),
@@ -652,13 +738,10 @@ class _MapScreenState extends State<MapScreen> {
                 ),
                 const SizedBox(width: 8),
                 _MapButton(
-                  icon: Icons.compare_arrows_rounded,
-                  label: 'Compare',
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (_) => const CompareCategoriesScreen()),
-                  ).then((_) => _buildMarkers()),
+                  icon: Icons.diversity_3_rounded,
+                  label: group == null ? 'Groups' : group.name,
+                  active: group != null,
+                  onTap: _openGroups,
                 ),
               ],
             ),

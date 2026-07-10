@@ -134,10 +134,6 @@ class SocialService {
   static Future<void> Function(String ownerUid, String planId, bool going,
       String restaurantName, DateTime? when)? cloudSendReply;
 
-  /// Set by the cloud layer: re-fetch every friend's categories (and
-  /// auto-link matching ones).
-  static Future<void> Function()? cloudRefreshCategories;
-
   /// Accept or decline a plan invite.
   static Future<void> respondInvite(PlanInvite invite, bool going) async {
     await cloudRespondInvite?.call(invite, going);
@@ -209,12 +205,6 @@ class SocialService {
     if (cloudMode) {
       return cloudAt[restaurantName.trim().toLowerCase()] ?? const [];
     }
-    return const [];
-  }
-
-  /// A specific friend's categories.
-  static List<AppCategory> categoriesFor(String friendName) {
-    if (cloudMode) return cloudCategories[friendName] ?? const [];
     return const [];
   }
 

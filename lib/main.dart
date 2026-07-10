@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'data/app_prefs.dart';
 import 'data/auth_service.dart';
 import 'data/block_store.dart';
-import 'data/category_mapping.dart';
 import 'data/category_store.dart';
 import 'data/firebase_services.dart';
 import 'data/folder_store.dart';
@@ -26,7 +25,6 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await ThemeController.load();
   await CategoryStore.load();
-  await CategoryMapping.load();
   await AppPrefs.load();
   AppTheme.usePalette(AppPrefs.themeAccent.value);
   await RatingBarsStore.load();

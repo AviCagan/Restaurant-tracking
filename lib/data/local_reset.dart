@@ -5,7 +5,6 @@ import '../theme/theme_controller.dart';
 import 'app_prefs.dart';
 import 'catalog.dart';
 import 'block_store.dart';
-import 'category_mapping.dart';
 import 'category_store.dart';
 import 'folder_store.dart';
 import 'friend_group_store.dart';
@@ -30,8 +29,6 @@ class LocalReset {
     // 3. Reset the in-memory state the UI is watching — clearing storage
     //    alone leaves the old values live until a restart.
     CategoryStore.all.value = List.of(Catalog.starters);
-    CategoryMapping.map.value = {};
-    CategoryMapping.hidden.value = {};
     FolderStore.all.value = [];
     FriendGroupStore.all.value = [];
     PlanStore.all.value = [];
