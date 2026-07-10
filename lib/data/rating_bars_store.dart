@@ -67,6 +67,11 @@ class RatingBarsStore {
   static final ValueNotifier<List<BarDef>> all =
       ValueNotifier<List<BarDef>>(List.of(_defaults));
 
+  /// Back to just the built-in Food + Atmosphere bars (full reset).
+  static void resetToDefaults() {
+    all.value = List.of(_defaults);
+  }
+
   static Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_key);

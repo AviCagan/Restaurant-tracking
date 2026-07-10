@@ -188,4 +188,15 @@ class RestaurantDatabase {
     await db.delete(_table, where: 'id = ?', whereArgs: [id]);
     onDelete?.call(id);
   }
+
+  /// Erase every restaurant on this device (account deletion / full reset).
+  Future<void> wipeAll() async {
+    if (kIsWeb) {
+      _webCache = [];
+      await _webSave();
+      return;
+    }
+    final db = await _database;
+    await db.delete(_table);
+  }
 }

@@ -17,11 +17,13 @@ import '../models/user_profile.dart';
 import '../services/email_service.dart';
 import '../services/notification_service.dart';
 import '../services/rating_digest.dart';
+import '../services/web_bridge/web_bridge.dart' as web;
 import 'app_prefs.dart';
 import 'auth_service.dart';
 import 'block_store.dart';
 import 'category_mapping.dart';
 import 'category_store.dart';
+import 'local_reset.dart';
 import 'friend_group_store.dart';
 import 'plan_store.dart';
 import 'restaurant_database.dart';
@@ -101,7 +103,15 @@ class FirebaseAuthService {
   static Future<UserProfile?> signInWithGoogle() async {
     fb.User? user;
     if (kIsWeb) {
-      // Browsers use Firebase's own popup flow — no plugin config needed.
+      // Installed home-screen web apps (iOS especially) can't open popups —
+      // they must use the redirect flow: the page navigates to Google and
+      // back, and the auth listener finishes the sign-in on return.
+      if (web.isStandalonePwa()) {
+        await fb.FirebaseAuth.instance
+            .signInWithRedirect(fb.GoogleAuthProvider());
+        return null; // page is about to navigate away
+      }
+      // Regular browser tabs use the popup flow.
       final cred = await fb.FirebaseAuth.instance
           .signInWithPopup(fb.GoogleAuthProvider());
       user = cred.user;
@@ -243,6 +253,7 @@ class FirebaseAuthService {
       // Local/demo account — nothing in the cloud to remove.
       await AuthService.signOut();
       SocialService.resetLocal();
+      await LocalReset.wipeAll();
       return null;
     }
 
@@ -315,6 +326,7 @@ class FirebaseAuthService {
       'friends',
       'friendRequests',
       'planInvites',
+      'planReplies',
     ]) {
       try {
         final snap =
@@ -367,6 +379,10 @@ class FirebaseAuthService {
     CloudBoot.needsSetup.value = false;
     await AuthService.signOut();
     SocialService.resetLocal();
+    // Factory-reset this device too: deleting the account means EVERYTHING
+    // goes. Without this, the old restaurants/groups sat on the device and
+    // silently re-uploaded to the next account that signed in.
+    await LocalReset.wipeAll();
     return error;
   }
 
